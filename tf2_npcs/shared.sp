@@ -119,14 +119,60 @@ void base_npc_set_hull(int entity, float width, float height)
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
 }
 
-void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int defhealth)
+void TypeToClassname(TFClassType type, char[] str, int len)
+{
+	switch(type) {
+		case TFClass_Heavy: { strcopy(str, len, "heavy"); }
+		case TFClass_Scout: { strcopy(str, len, "scout"); }
+		case TFClass_Pyro: { strcopy(str, len, "pyro"); }
+		case TFClass_Medic: { strcopy(str, len, "medic"); }
+		case TFClass_Spy: { strcopy(str, len, "spy"); }
+		case TFClass_Engineer: { strcopy(str, len, "engineer"); }
+		case TFClass_Sniper: { strcopy(str, len, "sniper"); }
+		case TFClass_Soldier: { strcopy(str, len, "soldier"); }
+		case TFClass_DemoMan: { strcopy(str, len, "demo"); }
+	}
+}
+
+void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int defhealth, bool defminiboss = false)
 {
 	int health = data.GetNum("Health", defhealth);
-
 	float scale = data.GetFloat("ModelScale", 1.0);
+	bool miniboss = view_as<bool>(data.GetNum("MiniBoss", view_as<int>(defminiboss)));
 
+	char classname[32];
+	data.GetString("Class", classname, sizeof(classname));
+
+	TFClassType class = TFClass_Unknown;
+	if(!StrEqual(classname, "")) {
+		class = TF2_GetClass(classname);
+	}
+
+	spawner.set_data("Class", class);
 	spawner.set_data("Health", health);
 	spawner.set_data("Scale", scale);
+	spawner.set_data("MiniBoss", miniboss);
+}
+
+bool base_npc_pop_isminiboss(CustomPopulationSpawner spawner, int num)
+{
+	return spawner.get_data("MiniBoss");
+}
+
+bool base_npc_pop_getclassicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	TFClassType class = spawner.get_data("Class");
+	if(class == TFClass_Unknown) {
+		strcopy(str, len, "Tank");
+	} else {
+		TypeToClassname(class, str, len);
+	}
+	return true;
+}
+
+int base_npc_pop_getclass(CustomPopulationSpawner spawner, int num)
+{
+	return spawner.get_data("Class");
 }
 
 void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)

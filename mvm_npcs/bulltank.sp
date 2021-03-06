@@ -29,9 +29,10 @@ void bulltank_init()
 	CustomPopulationSpawner spawner = register_popspawner("Bulltank");
 	spawner.Parse = BulltankPopParse;
 	spawner.Spawn = BulltankPopSpawn;
-	spawner.GetClassIcon = BulltankPopGetClassIcon;
-	spawner.IsMiniBoss = BulltankPopIsMiniBoss;
+	spawner.GetClass = base_npc_pop_getclass;
+	spawner.GetClassIcon = base_npc_pop_getclassicon;
 	spawner.GetHealth = base_npc_pop_get_health;
+	spawner.IsMiniBoss = base_npc_pop_isminiboss;
 }
 
 void bulltank_precache(int entity, BaseAnimating anim)
@@ -60,21 +61,9 @@ int CreateBulltank()
 	return entity;
 }
 
-bool BulltankPopGetClassIcon(CustomPopulationSpawner spawner, int num, char[] str, int len)
-{
-	strcopy(str, len, "Tank");
-	return true;
-}
-
-bool BulltankPopIsMiniBoss(CustomPopulationSpawner spawner, int num)
-{
-	return true;
-}
-
 bool BulltankPopParse(CustomPopulationSpawner spawner, KeyValues data)
 {
-	base_npc_pop_parse(spawner, data, deadnaut_health.IntValue);
-
+	base_npc_pop_parse(spawner, data, bulltank_health.IntValue, true);
 	return true;
 }
 
