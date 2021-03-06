@@ -79,6 +79,7 @@ bool BulltankPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList r
 	if(result != null) {
 		result.Push(entity);
 	}
+
 	return true;
 }
 
@@ -103,7 +104,7 @@ void OnBulltankThink(int entity)
 {
 	BulltankState state = GetEntCustomProp(entity, "m_nState");
 
-	if(GetEntProp(entity, Prop_Data, "m_lifeState") == 1) {
+	if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
 		state = Bulltank_Dying;
 	}
 

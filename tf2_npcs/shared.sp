@@ -50,23 +50,27 @@ void base_npc_spawn(int entity)
 	IBodyCustom body = bot.AllocateCustomBody();
 	bot.AllocateCustomLocomotion();
 
-	body.CollisionGroup = COLLISION_GROUP_NPC;
 	body.SolidMask = MASK_NPCSOLID|CONTENTS_PLAYERCLIP;
-	
-	SetEntProp(entity, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_NPC);
+
+	SetEntProp(entity, Prop_Send, "m_nSolidType", SOLID_BBOX);
+
+	int flags = GetEdictFlags(entity);
+	flags |= FL_EDICT_DIRTY_PVS_INFORMATION;
+	SetEdictFlags(entity, flags);
 
 	SetEntityMoveType(entity, MOVETYPE_CUSTOM);
+
+	//setting any of these while the entity is in the MVM spawn zone makes it disapper very weird
+	/*
+	body.CollisionGroup = COLLISION_GROUP_NPC;
+
+	SetEntProp(entity, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_NPC);
 
 	int flags = GetEntityFlags(entity);
 	flags |= FL_NPC;
 	SetEntityFlags(entity, flags);
 
 	SetEntProp(entity, Prop_Send, "m_nSurroundType", USE_ROTATION_EXPANDED_BOUNDS);
-	SetEntProp(entity, Prop_Send, "m_nSolidType", SOLID_BBOX);
-
-	flags = GetEdictFlags(entity);
-	flags |= FL_EDICT_DIRTY_PVS_INFORMATION;
-	SetEdictFlags(entity, flags);
 
 	flags = GetEntProp(entity, Prop_Data, "m_iEFlags");
 	flags |= EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS|EFL_DIRTY_SPATIAL_PARTITION|EFL_DONTWALKON;
@@ -75,6 +79,7 @@ void base_npc_spawn(int entity)
 	flags = GetEntProp(entity, Prop_Send, "m_usSolidFlags");
 	flags |= FSOLID_NOT_STANDABLE;
 	SetEntProp(entity, Prop_Send, "m_usSolidFlags", flags);
+	*/
 
 	PathFollower path = new PathFollower();
 	path.MinLookAheadDistance = tf_bot_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
@@ -210,10 +215,9 @@ TFTeam GetEntityTFTeam(int entity)
 	return view_as<TFTeam>(GetEntProp(entity, Prop_Data, "m_iTeamNum"));
 }
 
-/*
 int g_iLaserBeamIndex = -1;
 float drawlifetime = 0.1;
-float drawcolor[4] = {255.0, 0.0, 0.0, 255.0};
+int drawcolor[4] = {255, 0, 0, 255};
 
 void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const float mins[3]={-16.0, -16.0, 0.0}, const float maxs[3]={16.0, 16.0, 72.0})
 {
@@ -319,4 +323,3 @@ void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const fl
 		TE_SendToAll();
 	}
 }
-*/

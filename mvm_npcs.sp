@@ -19,6 +19,8 @@ public void OnPluginStart()
 	mvm_npcs_init();
 
 	RegConsoleCmd("testmvm", cmd);
+	RegConsoleCmd("testmvm2", cmd2);
+	RegConsoleCmd("testmvm3", cmd3);
 }
 
 bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
@@ -26,9 +28,47 @@ bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
 	return entity != data;
 }
 
+Action cmd3(int client, int args)
+{
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, "npc_bulltank")) != -1) {
+		float pos[3];
+		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
+
+		TeleportEntity(client, pos);
+
+		break;
+	}
+
+	return Plugin_Handled;
+}
+
+Action cmd2(int client, int args)
+{
+	float origin[3];
+	GetClientEyePosition(client, origin);
+
+	float angles[3];
+	GetClientEyeAngles(client, angles);
+
+	Handle trace = TR_TraceRayFilterEx(origin, angles, MASK_SOLID, RayType_Infinite, TraceEntityFilter_DontHitEntity, client);
+
+	float end[3];
+	TR_GetEndPosition(end, trace);
+
+	delete trace;
+
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, "npc_bulltank")) != -1) {
+		TeleportEntity(entity, end);
+	}
+
+	return Plugin_Handled;
+}
+
 Action cmd(int client, int args)
 {
-	int entity = CreateDeadnaut();
+	int entity = CreateBulltank();
 
 	float origin[3];
 	GetClientEyePosition(client, origin);

@@ -208,12 +208,12 @@ void OnDeadnautThink(int entity)
 			int sequence = deadnaut_anim_Land;
 			anim.ResetSequence(sequence);
 
-			//SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 0.0);
-			//SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
+			SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 0.0);
+			SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				//SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
-				//SetEntPropFloat(entity, Prop_Send, "m_flCycle", 1.0);
+				SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
+				SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
 				SetEntCustomProp(entity, "m_nState", Deadnaut_Landing);
 			}
 		}
