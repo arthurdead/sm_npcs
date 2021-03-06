@@ -28,7 +28,7 @@ bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
 
 Action cmd(int client, int args)
 {
-	int entity = CreateBulltank();
+	int entity = CreateDeadnaut();
 
 	float origin[3];
 	GetClientEyePosition(client, origin);

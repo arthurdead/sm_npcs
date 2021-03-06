@@ -45,6 +45,9 @@ void deadnaut_init()
 	CustomPopulationSpawner spawner = register_popspawner("Deadnaut");
 	spawner.Parse = DeadnautPopParse;
 	spawner.Spawn = DeadnautPopSpawn;
+	spawner.GetClass = DeadnautPopGetClass;
+	spawner.GetClassIcon = DeadnautPopGetClassIcon;
+	spawner.GetHealth = base_npc_pop_get_health;
 }
 
 void deadnaut_precache(int entity, BaseAnimating anim)
@@ -88,27 +91,40 @@ int CreateDeadnaut(TFClassType class = TFClass_Unknown)
 	return entity;
 }
 
-bool DeadnautPopParse(KeyValues data)
+bool DeadnautPopParse(CustomPopulationSpawner spawner, KeyValues data)
 {
-	base_npc_pop_parse(data, deadnaut_health.IntValue);
+	base_npc_pop_parse(spawner, data, deadnaut_health.IntValue);
 
 	char classname[32];
 	data.GetString("Class", classname, sizeof(classname));
 
 	TFClassType class = TF2_GetClass(classname);
 
-	//????????
+	spawner.set_data("Class", class);
 
 	return true;
 }
 
-bool DeadnautPopSpawn(float pos[3], ArrayList result)
+bool DeadnautPopGetClassIcon(CustomPopulationSpawner spawner, int num, char[] str, int len)
 {
-	//????????
+	TFClassType class = spawner.get_data("Class");
+	//TODO
+	return false;
+}
 
-	int entity = CreateDeadnaut(TFClass_Unknown);
+int DeadnautPopGetClass(CustomPopulationSpawner spawner, int num)
+{
+	//is TFClassType in the same order as the actual tf2 enum ?????
+	return spawner.get_data("Class");
+}
 
-	base_npc_pop_spawn(entity);
+bool DeadnautPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
+{
+	TFClassType class = spawner.get_data("Class");
+
+	int entity = CreateDeadnaut(class);
+
+	base_npc_pop_spawn(spawner, entity);
 
 	TeleportEntity(entity, pos);
 
@@ -165,7 +181,7 @@ void OnDeadnautSpawn(int entity)
 
 	int health = GetEntProp(entity, Prop_Data, "m_iHealth");
 	if(health == 0) {
-		SetEntityHealth(entity, deadnaut_health.IntValue);
+		SetEntProp(entity, Prop_Data, "m_iHealth", deadnaut_health.IntValue);
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", deadnaut_health.IntValue);
 	}
 

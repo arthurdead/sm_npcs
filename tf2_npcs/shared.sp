@@ -68,9 +68,9 @@ void base_npc_spawn(int entity)
 	flags |= FL_EDICT_DIRTY_PVS_INFORMATION;
 	SetEdictFlags(entity, flags);
 
-	flags = GetEntProp(entity, Prop_Send, "m_iEFlags");
+	flags = GetEntProp(entity, Prop_Data, "m_iEFlags");
 	flags |= EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS|EFL_DIRTY_SPATIAL_PARTITION|EFL_DONTWALKON;
-	SetEntProp(entity, Prop_Send, "m_iEFlags", flags);
+	SetEntProp(entity, Prop_Data, "m_iEFlags", flags);
 
 	flags = GetEntProp(entity, Prop_Send, "m_usSolidFlags");
 	flags |= FSOLID_NOT_STANDABLE;
@@ -119,21 +119,29 @@ void base_npc_set_hull(int entity, float width, float height)
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
 }
 
-void base_npc_pop_parse(KeyValues data, int defhealth)
+void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int defhealth)
 {
 	int health = data.GetNum("Health", defhealth);
 
 	float scale = data.GetFloat("ModelScale", 1.0);
 
-	//???????
+	spawner.set_data("Health", health);
+	spawner.set_data("Scale", scale);
 }
 
-void base_npc_pop_spawn(int entity)
+void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)
 {
-	//???????
+	int health = spawner.get_data("Health");
+	float scale = spawner.get_data("Scale");
 
-	//SetEntityHealth(entity, );
-	//SetEntPropFloat(entity, Prop_Send, "m_flModelScale", );
+	SetEntProp(entity, Prop_Data, "m_iHealth", health);
+	SetEntProp(entity, Prop_Data, "m_iMaxHealth", health);
+	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", scale);
+}
+
+int base_npc_pop_get_health(CustomPopulationSpawner spawner, int num)
+{
+	return spawner.get_data("Health");
 }
 
 TFTeam GetEntityTFTeam(int entity)

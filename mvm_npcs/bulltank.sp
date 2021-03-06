@@ -29,6 +29,9 @@ void bulltank_init()
 	CustomPopulationSpawner spawner = register_popspawner("Bulltank");
 	spawner.Parse = BulltankPopParse;
 	spawner.Spawn = BulltankPopSpawn;
+	spawner.GetClassIcon = BulltankPopGetClassIcon;
+	spawner.IsMiniBoss = BulltankPopIsMiniBoss;
+	spawner.GetHealth = base_npc_pop_get_health;
 }
 
 void bulltank_precache(int entity, BaseAnimating anim)
@@ -57,15 +60,32 @@ int CreateBulltank()
 	return entity;
 }
 
-bool BulltankPopParse(KeyValues data)
+bool BulltankPopGetClassIcon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	strcopy(str, len, "Tank");
+	return true;
+}
+
+bool BulltankPopIsMiniBoss(CustomPopulationSpawner spawner, int num)
 {
 	return true;
 }
 
-bool BulltankPopSpawn(float pos[3], ArrayList result)
+bool BulltankPopParse(CustomPopulationSpawner spawner, KeyValues data)
+{
+	base_npc_pop_parse(spawner, data, deadnaut_health.IntValue);
+
+	return true;
+}
+
+bool BulltankPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
 {
 	int entity = CreateBulltank();
+
+	base_npc_pop_spawn(spawner, entity);
+
 	TeleportEntity(entity, pos);
+
 	if(result != null) {
 		result.Push(entity);
 	}
@@ -82,7 +102,7 @@ void OnBulltankSpawn(int entity)
 
 	int health = GetEntProp(entity, Prop_Data, "m_iHealth");
 	if(health == 0) {
-		SetEntityHealth(entity, bulltank_health.IntValue);
+		SetEntProp(entity, Prop_Data, "m_iHealth", bulltank_health.IntValue);
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", bulltank_health.IntValue);
 	}
 
