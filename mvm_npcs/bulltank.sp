@@ -33,6 +33,7 @@ void bulltank_init()
 	spawner.GetClassIcon = base_npc_pop_getclassicon;
 	spawner.GetHealth = base_npc_pop_get_health;
 	spawner.IsMiniBoss = base_npc_pop_isminiboss;
+	spawner.HasAttribute = base_npc_pop_hasattribute;
 }
 
 void bulltank_precache(int entity, BaseAnimating anim)

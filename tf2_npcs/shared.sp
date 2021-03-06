@@ -175,6 +175,21 @@ int base_npc_pop_getclass(CustomPopulationSpawner spawner, int num)
 	return spawner.get_data("Class");
 }
 
+bool base_npc_pop_hasattribute(CustomPopulationSpawner spawner, AttributeType attr, int num)
+{
+	if((attr & IGNORE_FLAG) || (attr & IS_NPC)) {
+		return true;
+	}
+
+	if(spawner.get_data("MiniBoss")) {
+		if(attr & MINIBOSS) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)
 {
 	int health = spawner.get_data("Health");
