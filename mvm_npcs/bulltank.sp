@@ -59,8 +59,6 @@ int CreateBulltank()
 
 bool BulltankPopParse(KeyValues data)
 {
-	int health = data.GetNum("Health", bulltank_health.IntValue);
-
 	return true;
 }
 
