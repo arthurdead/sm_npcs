@@ -20,8 +20,9 @@ ConVar bulltank_health = null;
 
 void bulltank_init()
 {
-	Handle factory = register_nextbot_factory("npc_bulltank");
-	override_serverclass_factory(factory, "NextBotCombatCharacter", "CTFTankBoss");
+	CustomEntityFactory factory = register_nextbot_factory("npc_bulltank");
+	CustomSendtable sendtable = sendtable_from_nextbot_factory(factory);
+	sendtable.override_with("CTFTankBoss");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
 	base_npc_init_datamaps(datamap);
 
@@ -98,14 +99,14 @@ void OnBulltankSpawn(int entity)
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", bulltank_health.IntValue);
 	}
 
-	SetEntCustomProp(entity, "m_nState", Bulltank_Spawning);
+	SetEntProp(entity, Prop_Data, "m_nState", Bulltank_Spawning);
 }
 
 void OnBulltankThink(int entity)
 {
 	base_npc_think(entity);
 
-	BulltankState state = GetEntCustomProp(entity, "m_nState");
+	BulltankState state = GetEntProp(entity, Prop_Data, "m_nState");
 
 	if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
 		state = Bulltank_Dying;
@@ -121,7 +122,7 @@ void OnBulltankThink(int entity)
 			anim.ResetSequence(bulltank_anim_Shell);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				SetEntCustomProp(entity, "m_nState", Bulltank_Default);
+				SetEntProp(entity, Prop_Data, "m_nState", Bulltank_Default);
 			}
 		}
 		case Bulltank_Dying: {
@@ -135,20 +136,20 @@ void OnBulltankThink(int entity)
 			anim.ResetSequence(bulltank_anim_ShellUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				SetEntCustomProp(entity, "m_nState", Bulltank_Default);
+				SetEntProp(entity, Prop_Data, "m_nState", Bulltank_Default);
 			}
 		}
 		case Bulltank_Default: {
 			NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
-			PathFollower path = GetEntCustomProp(entity, "m_pPathFollower");
+			PathFollower path = GetEntProp(entity, Prop_Data, "m_pPathFollower");
 
-			if(GetEntCustomPropFloat(entity, "m_flRepathTime") <= GetGameTime()) {
+			if(GetEntPropFloat(entity, Prop_Data, "m_flRepathTime") <= GetGameTime()) {
 				float pos[3];
 				if(FindBombSite(pos)) {
 					path.ComputeVector(bot, pos, baseline_path_cost, cost_flags_safest|cost_flags_discrete);
 				}
-				SetEntCustomPropFloat(entity, "m_flRepathTime", GetGameTime() + 0.5);
+				SetEntPropFloat(entity, Prop_Data, "m_flRepathTime", GetGameTime() + 0.5);
 			}
 
 			float m_flGroundSpeed = 999.0;

@@ -85,16 +85,16 @@ void base_npc_spawn(int entity)
 
 	PathFollower path = new PathFollower();
 	path.MinLookAheadDistance = tf_bot_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
-	SetEntCustomProp(entity, "m_pPathFollower", path);
+	SetEntProp(entity, Prop_Data, "m_pPathFollower", path);
 }
 
 void base_npc_deleted(int entity)
 {
-	PathFollower path = GetEntCustomProp(entity, "m_pPathFollower");
+	PathFollower path = GetEntProp(entity, Prop_Data, "m_pPathFollower");
 	if(path != null) {
 		delete path;
 	}
-	SetEntCustomProp(entity, "m_pPathFollower", 0);
+	SetEntProp(entity, Prop_Data, "m_pPathFollower", 0);
 }
 
 void base_npc_set_hull(int entity, float width, float height)

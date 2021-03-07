@@ -32,8 +32,9 @@ ConVar deadnaut_health = null;
 
 void deadnaut_init()
 {
-	Handle factory = register_nextbot_factory("npc_deadnaut");
-	override_serverclass_factory(factory, "NextBotCombatCharacter", "CTFBaseBoss");
+	CustomEntityFactory factory = register_nextbot_factory("npc_deadnaut");
+	CustomSendtable sendtable = sendtable_from_nextbot_factory(factory);
+	sendtable.override_with("CTFBaseBoss");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
 	base_npc_init_datamaps(datamap);
 #if !defined DEADNAUT_CLASS_MODELS_DONT_BONEMERGE
@@ -87,7 +88,7 @@ void deadnaut_precache(int entity, BaseAnimating anim)
 int CreateDeadnaut(TFClassType class = TFClass_Unknown)
 {
 	int entity = CreateEntityByName("npc_deadnaut");
-	SetEntCustomProp(entity, "m_iClass", class);
+	SetEntProp(entity, Prop_Data, "m_iClass", class);
 	DispatchSpawn(entity);
 	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TFTeam_Blue);
 	ActivateEntity(entity);
@@ -152,13 +153,13 @@ void OnDeadnautSpawn(int entity)
 			SetEntProp(body, Prop_Send, "m_fEffects", EF_BONEMERGE|EF_PARENT_ANIMATES);
 			SetEntProp(entity, Prop_Send, "m_fEffects", EF_NODRAW|EF_NOSHADOW|EF_NORECEIVESHADOW);
 
-			SetEntCustomProp(entity, "m_hBody", body);
+			SetEntProp(entity, Prop_Data, "m_hBody", body);
 		}
 	#endif
 	} else {
 		SetEntityModel(entity, team == TFTeam_Red ? "models/deadnaut/animation/deadnaut_animation.mdl" : "models/deadnaut/deadnaut_heavy_anim.mdl");
 
-		SetEntCustomProp(entity, "m_iClass", TFClass_Unknown);
+		SetEntProp(entity, Prop_Data, "m_iClass", TFClass_Unknown);
 	}
 
 	int health = GetEntProp(entity, Prop_Data, "m_iHealth");
@@ -167,7 +168,7 @@ void OnDeadnautSpawn(int entity)
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", deadnaut_health.IntValue);
 	}
 
-	SetEntCustomProp(entity, "m_nState", Deadnaut_Spawning);
+	SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Spawning);
 
 	//INextBot bot = INextBot(entity);
 	//NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
@@ -183,7 +184,7 @@ void OnDeadnautThink(int entity)
 {
 	base_npc_think(entity);
 
-	DeadnautState state = GetEntCustomProp(entity, "m_nState");
+	DeadnautState state = GetEntProp(entity, Prop_Data, "m_nState");
 	INextBot bot = INextBot(entity);
 	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
@@ -192,7 +193,7 @@ void OnDeadnautThink(int entity)
 	if(state != Deadnaut_Dying && state != Deadnaut_Spawning) {
 		if(!locomotion.OnGround) {
 			if(state != Deadnaut_Falling) {
-				SetEntCustomProp(entity, "m_nState", Deadnaut_Falling);
+				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Falling);
 				return;
 			}
 		} else if(locomotion.OnGround && state == Deadnaut_Falling) {
@@ -200,24 +201,24 @@ void OnDeadnautThink(int entity)
 			SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
 			SetEntPropFloat(entity, Prop_Data, "m_flAnimTime", GetGameTime());
 			anim.ResetSequenceInfo();
-			SetEntCustomProp(entity, "m_nState", Deadnaut_Landing);
+			SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Landing);
 			return;
 		} else {
 			if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
-				SetEntCustomProp(entity, "m_nState", Deadnaut_Dying);
+				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Dying);
 				return;
 			}
 		}
 	}
 
-	TFClassType class = GetEntCustomProp(entity, "m_iClass");
+	TFClassType class = GetEntProp(entity, Prop_Data, "m_iClass");
 
 	switch(state) {
 		case Deadnaut_Landing: {
 			anim.ResetSequence(deadnaut_anim_Land);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				SetEntCustomProp(entity, "m_nState", Deadnaut_Default);
+				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Default);
 			}
 		}
 		case Deadnaut_Falling: {
@@ -237,13 +238,13 @@ void OnDeadnautThink(int entity)
 			anim.ResetSequence(deadnaut_anim_StandUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				SetEntCustomProp(entity, "m_nState", Deadnaut_Default);
+				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Default);
 			}
 		}
 		case Deadnaut_Default: {
-			PathFollower path = GetEntCustomProp(entity, "m_pPathFollower");
+			PathFollower path = GetEntProp(entity, Prop_Data, "m_pPathFollower");
 
-			if(GetEntCustomPropFloat(entity, "m_flRepathTime") <= GetGameTime()) {
+			if(GetEntPropFloat(entity, Prop_Data, "m_flRepathTime") <= GetGameTime()) {
 				int target = -1;
 
 				IVision vision = bot.VisionInterface;
@@ -263,12 +264,12 @@ void OnDeadnautThink(int entity)
 
 				if(target != -1) {
 					path.ComputeEntity(bot, target, baseline_path_cost, cost_flags);
-					SetEntCustomPropFloat(entity, "m_flRepathTime", GetGameTime() + 0.5);
+					SetEntPropFloat(entity, Prop_Data, "m_flRepathTime", GetGameTime() + 0.5);
 				} else {
 					float pos[3];
 					if(FindBombSite(pos)) {
 						path.ComputeVector(bot, pos, baseline_path_cost, cost_flags);
-						SetEntCustomPropFloat(entity, "m_flRepathTime", GetGameTime() + 0.5);
+						SetEntPropFloat(entity, Prop_Data, "m_flRepathTime", GetGameTime() + 0.5);
 					}
 				}
 			}
