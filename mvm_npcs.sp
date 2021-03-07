@@ -16,11 +16,18 @@
 
 public void OnPluginStart()
 {
+	PrintToServer("on plugin loadddddddddddddddddddddddd!!!!!!!!!!!");
+
+	//override_serverclass_name("player", "CTFPlayer", "CHeadlessHatman");
+
 	mvm_npcs_init();
 
 	RegConsoleCmd("testmvm", cmd);
 	RegConsoleCmd("testmvm2", cmd2);
 	RegConsoleCmd("testmvm3", cmd3);
+	RegConsoleCmd("testmvm4", cmd4);
+	RegConsoleCmd("testmvm5", cmd5);
+	RegConsoleCmd("testmvm6", cmd6);
 }
 
 bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
@@ -66,9 +73,82 @@ Action cmd2(int client, int args)
 	return Plugin_Handled;
 }
 
+Action cmd6(int client, int args)
+{
+	int entity = CreateDeadnaut();
+
+	SetEntProp(entity, Prop_Send, "m_bGlowEnabled", 1);
+
+	PrintToServer("%i", entity);
+
+	float origin[3];
+	GetClientEyePosition(client, origin);
+
+	float angles[3];
+	GetClientEyeAngles(client, angles);
+
+	Handle trace = TR_TraceRayFilterEx(origin, angles, MASK_SOLID, RayType_Infinite, TraceEntityFilter_DontHitEntity, client);
+
+	float end[3];
+	TR_GetEndPosition(end, trace);
+
+	delete trace;
+
+	TeleportEntity(entity, end);
+
+	return Plugin_Handled;
+}
+
 Action cmd(int client, int args)
 {
 	int entity = CreateBulltank();
+
+	SetEntProp(entity, Prop_Send, "m_bGlowEnabled", 1);
+
+	PrintToServer("%i", entity);
+
+	float origin[3];
+	GetClientEyePosition(client, origin);
+
+	float angles[3];
+	GetClientEyeAngles(client, angles);
+
+	Handle trace = TR_TraceRayFilterEx(origin, angles, MASK_SOLID, RayType_Infinite, TraceEntityFilter_DontHitEntity, client);
+
+	float end[3];
+	TR_GetEndPosition(end, trace);
+
+	delete trace;
+
+	TeleportEntity(entity, end);
+
+	return Plugin_Handled;
+}
+
+Action cmd5(int client, int args)
+{
+	if(client != 0) {
+		SetEntProp(client, Prop_Send, "m_bGlowEnabled", 1);
+	}
+
+	int table = FindStringTable("instancebaseline");
+	int num = GetStringTableNumStrings(table);
+	for(int i = 0; i < num; ++i) {
+		char str[50];
+		ReadStringTable(table, i, str, sizeof(str));
+		PrintToServer("%s", str);
+	}
+	return Plugin_Handled;
+}
+
+Action cmd4(int client, int args)
+{
+	int entity = CreateEntityByName("tank_boss");
+	DispatchSpawn(entity);
+
+	SetEntProp(entity, Prop_Send, "m_bGlowEnabled", 1);
+
+	PrintToServer("%i", entity);
 
 	float origin[3];
 	GetClientEyePosition(client, origin);

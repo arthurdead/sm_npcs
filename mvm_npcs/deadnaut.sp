@@ -32,8 +32,9 @@ ConVar deadnaut_health = null;
 
 void deadnaut_init()
 {
-	Handle factory = register_entity_factory_ex("npc_deadnaut", datamaps_allocatenextbot, false);
-	CustomDatamap datamap = CustomDatamap.from_factory(factory, false);
+	Handle factory = register_nextbot_factory("npc_deadnaut");
+	override_serverclass_factory(factory, "NextBotCombatCharacter", "CTFBaseBoss");
+	CustomDatamap datamap = CustomDatamap.from_factory(factory);
 	base_npc_init_datamaps(datamap);
 #if !defined DEADNAUT_CLASS_MODELS_DONT_BONEMERGE
 	datamap.add_prop("m_hBody", custom_prop_int);
@@ -180,54 +181,60 @@ void OnDeadnautSpawn(int entity)
 
 void OnDeadnautThink(int entity)
 {
+	base_npc_think(entity);
+
 	DeadnautState state = GetEntCustomProp(entity, "m_nState");
 	INextBot bot = INextBot(entity);
 	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
-	if(state != Deadnaut_Landing) {
+	BaseAnimating anim = BaseAnimating(entity);
+
+	if(state != Deadnaut_Dying && state != Deadnaut_Spawning) {
 		if(!locomotion.OnGround) {
-			state = Deadnaut_Falling;
-		} else if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
-			state = Deadnaut_Dying;
+			if(state != Deadnaut_Falling) {
+				SetEntCustomProp(entity, "m_nState", Deadnaut_Falling);
+				return;
+			}
+		} else if(locomotion.OnGround && state == Deadnaut_Falling) {
+			SetEntProp(entity, Prop_Send, "m_nSequence", -1);
+			SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
+			SetEntPropFloat(entity, Prop_Data, "m_flAnimTime", GetGameTime());
+			anim.ResetSequenceInfo();
+			SetEntCustomProp(entity, "m_nState", Deadnaut_Landing);
+			return;
+		} else {
+			if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
+				SetEntCustomProp(entity, "m_nState", Deadnaut_Dying);
+				return;
+			}
 		}
 	}
 
 	TFClassType class = GetEntCustomProp(entity, "m_iClass");
-	BaseAnimating anim = BaseAnimating(entity);
 
 	switch(state) {
 		case Deadnaut_Landing: {
-			int sequence = deadnaut_anim_Land;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(deadnaut_anim_Land);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntCustomProp(entity, "m_nState", Deadnaut_Default);
 			}
 		}
 		case Deadnaut_Falling: {
-			int sequence = deadnaut_anim_Land;
-			anim.ResetSequence(sequence);
-
-			SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 0.0);
+			SetEntProp(entity, Prop_Send, "m_nSequence", deadnaut_anim_Land);
 			SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
-
-			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-				SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
-				SetEntPropFloat(entity, Prop_Send, "m_flCycle", 0.0);
-				SetEntCustomProp(entity, "m_nState", Deadnaut_Landing);
-			}
+			SetEntPropFloat(entity, Prop_Data, "m_flAnimTime", GetGameTime());
+			return;
 		}
 		case Deadnaut_Dying: {
-			int sequence = deadnaut_anim_Brace;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(deadnaut_anim_Brace);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				RequestFrame(FrameRemoveEntity, entity);
 			}
 		}
 		case Deadnaut_Spawning: {
-			int sequence = deadnaut_anim_StandUp;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(deadnaut_anim_StandUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntCustomProp(entity, "m_nState", Deadnaut_Default);

@@ -20,8 +20,9 @@ ConVar bulltank_health = null;
 
 void bulltank_init()
 {
-	Handle factory = register_entity_factory_ex("npc_bulltank", datamaps_allocatenextbot, false);
-	CustomDatamap datamap = CustomDatamap.from_factory(factory, false);
+	Handle factory = register_nextbot_factory("npc_bulltank");
+	override_serverclass_factory(factory, "NextBotCombatCharacter", "CTFTankBoss");
+	CustomDatamap datamap = CustomDatamap.from_factory(factory);
 	base_npc_init_datamaps(datamap);
 
 	bulltank_health = CreateConVar("bulltank_health", "100");
@@ -102,6 +103,8 @@ void OnBulltankSpawn(int entity)
 
 void OnBulltankThink(int entity)
 {
+	base_npc_think(entity);
+
 	BulltankState state = GetEntCustomProp(entity, "m_nState");
 
 	if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
@@ -115,35 +118,27 @@ void OnBulltankThink(int entity)
 
 	switch(state) {
 		case Bulltank_Firing: {
-			int sequence = bulltank_anim_Shell;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(bulltank_anim_Shell);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntCustomProp(entity, "m_nState", Bulltank_Default);
 			}
 		}
 		case Bulltank_Dying: {
-			int sequence = bulltank_anim_Shell2;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(bulltank_anim_Shell2);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				RequestFrame(FrameRemoveEntity, entity);
 			}
 		}
 		case Bulltank_Spawning: {
-			int sequence = bulltank_anim_ShellUp;
-			anim.ResetSequence(sequence);
+			anim.ResetSequence(bulltank_anim_ShellUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntCustomProp(entity, "m_nState", Bulltank_Default);
 			}
 		}
 		case Bulltank_Default: {
-			if(GetRandomFloat(0.0, 1.0) == 0.9) {
-				SetEntCustomProp(entity, "m_nState", Bulltank_Firing);
-				return;
-			}
-
 			NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
 			PathFollower path = GetEntCustomProp(entity, "m_pPathFollower");

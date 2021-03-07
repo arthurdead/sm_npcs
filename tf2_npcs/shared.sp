@@ -24,10 +24,12 @@
 #define EFL_DONTWALKON (1 << 26)
 
 ConVar tf_bot_path_lookahead_range = null;
+ConVar base_npc_draw_hull = null;
 
 void base_npc_init()
 {
 	tf_bot_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
+	base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "1");
 }
 
 void base_npc_init_datamaps(CustomDatamap datamap)
@@ -66,7 +68,7 @@ void base_npc_spawn(int entity)
 
 	SetEntProp(entity, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_NPC);
 
-	int flags = GetEntityFlags(entity);
+	flags = GetEntityFlags(entity);
 	flags |= FL_NPC;
 	SetEntityFlags(entity, flags);
 
@@ -122,6 +124,35 @@ void base_npc_set_hull(int entity, float width, float height)
 
 	SetEntPropVector(entity, Prop_Send, "m_vecMins", hullMins);
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
+}
+
+void base_npc_think(int entity)
+{
+	if(base_npc_draw_hull.BoolValue) {
+		float pos[3];
+		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
+
+		float ang[3];
+		GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
+
+		INextBot bot = INextBot(entity);
+		IBody body = bot.BodyInterface;
+
+		float HullWidth = body.HullWidth;
+		float HullHeight = body.HullHeight;
+
+		float hullMins[3];
+		hullMins[0] = -HullWidth;
+		hullMins[1] = hullMins[0];
+		hullMins[2] = 0.0;
+
+		float hullMaxs[3];
+		hullMaxs[0] = HullWidth;
+		hullMaxs[1] = hullMaxs[0];
+		hullMaxs[2] = HullHeight;
+
+		DrawHull(pos, ang, hullMins, hullMaxs);
+	}
 }
 
 void TypeToClassname(TFClassType type, char[] str, int len)
@@ -182,7 +213,7 @@ int base_npc_pop_getclass(CustomPopulationSpawner spawner, int num)
 
 bool base_npc_pop_hasattribute(CustomPopulationSpawner spawner, AttributeType attr, int num)
 {
-	if((attr & IGNORE_FLAG) || (attr & IS_NPC)) {
+	if(attr & (IGNORE_FLAG|IS_NPC|REMOVE_ON_DEATH)) {
 		return true;
 	}
 
