@@ -26,9 +26,6 @@
 #define EFL_DIRTY_SPATIAL_PARTITION (1 << 15)
 #define EFL_DONTWALKON (1 << 26)
 
-#define ACT_IDLE 1
-#define ACT_WALK 6
-
 ConVar tf_bot_path_lookahead_range = null;
 ConVar base_npc_draw_hull = null;
 
@@ -43,6 +40,7 @@ void base_npc_init_datamaps(CustomDatamap datamap)
 	datamap.add_prop("m_pPathFollower", custom_prop_int);
 	datamap.add_prop("m_flRepathTime", custom_prop_float);
 	datamap.add_prop("m_nState", custom_prop_int);
+	datamap.add_prop("m_hTarget", custom_prop_int);
 }
 
 void base_npc_spawn(int entity)
@@ -51,7 +49,7 @@ void base_npc_spawn(int entity)
 	SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_YES);
 
 	INextBot bot = INextBot(entity);
-	IBodyCustom body = bot.AllocateCustomBody();
+	bot.AllocateCustomBody();
 	bot.AllocateCustomLocomotion();
 
 	SetEntProp(entity, Prop_Send, "m_nSolidType", SOLID_BBOX);
@@ -67,7 +65,7 @@ void base_npc_spawn(int entity)
 	SetEntProp(entity, Prop_Send, "m_nSurroundType", USE_ROTATION_EXPANDED_BOUNDS);
 
 	flags = GetEntProp(entity, Prop_Data, "m_iEFlags");
-	flags |= EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS|EFL_DIRTY_SPATIAL_PARTITION|EFL_DONTWALKON;
+	flags |= EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS|EFL_DIRTY_SPATIAL_PARTITION;
 	SetEntProp(entity, Prop_Data, "m_iEFlags", flags);
 
 	flags = GetEntProp(entity, Prop_Send, "m_usSolidFlags");
@@ -129,6 +127,8 @@ void base_npc_set_hull(int entity, float width, float height)
 
 void base_npc_think(int entity)
 {
+	
+
 	if(base_npc_draw_hull.BoolValue) {
 		float pos[3];
 		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
@@ -259,7 +259,17 @@ void base_npc_add_to_vision(int victim, int entity)
 	vision.AddKnownEntity(entity);
 }
 
-Action OnNPCTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
+int DamageRules_OnNPCTakeDamageAlive(int entity, CTakeDamageInfo info)
+{
+	int attacker = info.m_hAttacker;
+	if(attacker != -1) {
+		base_npc_add_to_vision(entity, attacker);
+	}
+
+	return baseline_ontakedamagealive(entity, info);
+}
+
+Action SDKHooks_OnNPCTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
 	base_npc_add_to_vision(victim, attacker);
 

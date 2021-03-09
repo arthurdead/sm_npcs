@@ -7,6 +7,7 @@
 #include <nextbot>
 #include <animhelpers>
 #include <popspawner>
+#include <damagerules>
 
 #include "base/shared.sp"
 
@@ -190,11 +191,11 @@ public void OnEntityCreated(int entity, const char[] classname)
 	if(StrEqual(classname, "npc_deadnaut")) {
 		SDKHook(entity, SDKHook_Think, OnDeadnautThink);
 		SDKHook(entity, SDKHook_Spawn, OnDeadnautSpawn);
-		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnNPCTakeDamage);
+		SDKHook(entity, SDKHook_OnTakeDamageAlive, SDKHooks_OnNPCTakeDamageAlive);
 	} else if(StrEqual(classname, "npc_bulltank")) {
 		SDKHook(entity, SDKHook_Think, OnBulltankThink);
 		SDKHook(entity, SDKHook_Spawn, OnBulltankSpawn);
-		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnNPCTakeDamage);
+		SDKHook(entity, SDKHook_OnTakeDamageAlive, SDKHooks_OnNPCTakeDamageAlive);
 	}
 }
 

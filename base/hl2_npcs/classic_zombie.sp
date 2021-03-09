@@ -3,15 +3,20 @@ enum ClassicZombieState
 	ClassicZombie_Spawning,
 	ClassicZombie_Dying,
 	ClassicZombie_Default,
+	ClassicZombie_Attacking,
 };
 
 ConVar classiczombie_health = null;
+
+Activity ACT_ZOM_RELEASECRAB = ACT_INVALID;
 
 void classiczombie_init()
 {
 	CustomEntityFactory factory = register_nextbot_factory("npc_classiczombie");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
 	base_npc_init_datamaps(datamap);
+	datamap.add_prop("m_flRecalcWalkAnim", custom_prop_float);
+	datamap.add_prop("m_nWalkAnim", custom_prop_int);
 
 	classiczombie_health = CreateConVar("classiczombie_health", "100");
 
@@ -51,6 +56,8 @@ void classiczombie_precache(int entity, BaseAnimating anim)
 	PrecacheModel("models/zombie/classic.mdl");
 
 	SetEntityModel(entity, "models/zombie/classic.mdl");
+
+	ACT_ZOM_RELEASECRAB = anim.LookupActivity("ACT_ZOM_RELEASECRAB");
 }
 
 void ClassicZombieRemoveAll()
@@ -70,7 +77,7 @@ void OnClassicZombieSpawn(int entity)
 
 	SetEntityModel(entity, "models/zombie/classic.mdl");
 
-	base_npc_set_hull(entity, 150.0, 250.0);
+	base_npc_set_hull(entity, 20.0, 70.0);
 
 	int health = GetEntProp(entity, Prop_Data, "m_iHealth");
 	if(health == 0) {
@@ -78,6 +85,24 @@ void OnClassicZombieSpawn(int entity)
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", classiczombie_health.IntValue);
 	}
 
+	static char spawnanims[][] =
+	{
+		"slumprise_a",
+		"slumprise_a2",
+		"slumprise_a_attack",
+		"slumprise_b",
+	};
+
+	BaseAnimating anim = BaseAnimating(entity);
+
+	int i = GetRandomInt(0, sizeof(spawnanims)-1);
+	int sequence = anim.LookupSequence(spawnanims[i]);
+
+	if(ACT_ZOM_RELEASECRAB == ACT_INVALID) {
+		ACT_ZOM_RELEASECRAB = anim.LookupActivity("ACT_ZOM_RELEASECRAB");
+	}
+
+	anim.ResetSequence(sequence);
 	SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Spawning);
 }
 
@@ -87,42 +112,73 @@ void OnClassicZombieThink(int entity)
 
 	ClassicZombieState state = GetEntProp(entity, Prop_Data, "m_nState");
 
-	if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
-		state = ClassicZombie_Dying;
+	BaseAnimating anim = BaseAnimating(entity);
+
+	if(state != ClassicZombie_Dying) {
+		if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
+			int sequence = anim.SelectWeightedSequence(ACT_ZOM_RELEASECRAB);
+			anim.ResetSequence(sequence);
+			SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Dying);
+			return;
+		}
 	}
 
 	INextBot bot = INextBot(entity);
-	BaseAnimating anim = BaseAnimating(entity);
-
-	anim.StudioFrameAdvance();
 
 	switch(state) {
+		case ClassicZombie_Attacking: {
+			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
+				SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Default);
+			}
+		}
 		case ClassicZombie_Dying: {
-			RequestFrame(FrameRemoveEntity, entity);
+			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
+				RequestFrame(FrameRemoveEntity, entity);
+			}
 		}
 		case ClassicZombie_Spawning: {
-			SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Default);
+			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
+				SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Default);
+			}
 		}
 		case ClassicZombie_Default: {
 			NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
 			PathFollower path = GetEntProp(entity, Prop_Data, "m_pPathFollower");
 
+			int target = EntRefToEntIndex(GetEntProp(entity, Prop_Data, "m_hTarget"));
+			if(IsValidEntity(target)) {
+				float target_pos[3];
+				GetEntPropVector(target, Prop_Data, "m_vecAbsOrigin", target_pos);
+
+				float my_pos[3];
+				GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", my_pos);
+
+				float distance = GetVectorDistance(my_pos, target_pos);
+				if(distance <= 50.0) {
+					int sequence = anim.SelectWeightedSequence(ACT_MELEE_ATTACK1);
+					anim.ResetSequence(sequence);
+					locomotion.FaceTowards(target_pos);
+					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Attacking);
+					return;
+				}
+			}
+
 			if(GetEntPropFloat(entity, Prop_Data, "m_flRepathTime") <= GetGameTime()) {
-				int target = -1;
+				target = -1;
 
 				IVision vision = bot.VisionInterface;
 				CKnownEntity threat = vision.GetPrimaryKnownThreat(false);
 				if(threat != CKnownEntity_Null) {
 					target = threat.Entity;
-				} else {
-					target = FindFurthestEscortTarget();
 				}
 
 				if(target != -1) {
 					path.ComputeEntity(bot, target, baseline_path_cost, cost_flags_mod);
 					SetEntPropFloat(entity, Prop_Data, "m_flRepathTime", GetGameTime() + 0.5);
+					SetEntProp(entity, Prop_Data, "m_hTarget", EntIndexToEntRef(target));
 				} else {
+					SetEntProp(entity, Prop_Data, "m_hTarget", -1);
 					float pos[3];
 					if(FindBombSite(pos)) {
 						path.ComputeVector(bot, pos, baseline_path_cost, cost_flags_mod);
@@ -131,16 +187,23 @@ void OnClassicZombieThink(int entity)
 				}
 			}
 
-			int sequence = anim.SelectWeightedSequence(ACT_WALK);
-			float speed = locomotion.GroundSpeed;
-			if(speed > 1.0) {
-				sequence = anim.SelectWeightedSequence(ACT_WALK);
+			if(GetEntPropFloat(entity, Prop_Data, "m_flRecalcWalkAnim") <= GetGameTime()) {
+				SetEntProp(entity, Prop_Data, "m_nWalkAnim", anim.SelectWeightedSequence(ACT_WALK));
+				SetEntPropFloat(entity, Prop_Data, "m_flRecalcWalkAnim", GetGameTime() + GetRandomFloat(1.0, 3.0));
 			}
 
-			PrintToServer("%i, %i", ACT_WALK, sequence);
+			int sequence = anim.SelectWeightedSequence(ACT_IDLE);
+			float speed = locomotion.GroundSpeed;
+			if(speed > 1.0) {
+				sequence = GetEntProp(entity, Prop_Data, "m_nWalkAnim");
+			}
+
 			anim.ResetSequence(sequence);
 
 			float m_flGroundSpeed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
+			if(m_flGroundSpeed == 0.0) {
+				m_flGroundSpeed = 999.0;
+			}
 
 			locomotion.RunSpeed = m_flGroundSpeed;
 			locomotion.WalkSpeed = m_flGroundSpeed;
@@ -148,4 +211,6 @@ void OnClassicZombieThink(int entity)
 			path.Update(bot);
 		}
 	}
+
+	anim.StudioFrameAdvance();
 }
