@@ -8,11 +8,11 @@
 #include <animhelpers>
 #include <popspawner>
 
-#include "tf2_npcs/shared.sp"
+#include "base/shared.sp"
 
-#include "mvm_npcs/shared.sp"
-#include "mvm_npcs/deadnaut.sp"
-#include "mvm_npcs/bulltank.sp"
+#include "base/mvm_npcs/shared.sp"
+#include "base/mvm_npcs/deadnaut.sp"
+#include "base/mvm_npcs/bulltank.sp"
 
 public void OnPluginStart()
 {
@@ -20,7 +20,10 @@ public void OnPluginStart()
 
 	//override_serverclass_name("player", "CTFPlayer", "CHeadlessHatman");
 
-	mvm_npcs_init();
+	base_npc_init();
+
+	bulltank_init();
+	deadnaut_init();
 
 	RegConsoleCmd("testmvm", cmd);
 	RegConsoleCmd("testmvm2", cmd2);
@@ -101,7 +104,7 @@ Action cmd6(int client, int args)
 
 Action cmd(int client, int args)
 {
-	int entity = CreateBulltank();
+	int entity = create_base_npc("npc_bulltank", TFTeam_Blue);
 
 	SetEntProp(entity, Prop_Send, "m_bGlowEnabled", 1);
 
@@ -170,19 +173,28 @@ Action cmd4(int client, int args)
 
 public void OnMapStart()
 {
-	mvm_npcs_precache();
+	int entity = CreateEntityByName("prop_dynamic_override");
+	DispatchKeyValue(entity, "model", "models/error.mdl");
+	DispatchSpawn(entity);
+
+	BaseAnimating anim = BaseAnimating(entity);
+
+	bulltank_precache(entity, anim);
+	deadnaut_precache(entity, anim);
+
+	RemoveEntity(entity);
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	if(StrEqual(classname, "npc_deadnaut")) {
 		SDKHook(entity, SDKHook_Think, OnDeadnautThink);
-		SDKHook(entity, SDKHook_SpawnPost, OnDeadnautSpawn);
-		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnTakeDamage);
+		SDKHook(entity, SDKHook_Spawn, OnDeadnautSpawn);
+		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnNPCTakeDamage);
 	} else if(StrEqual(classname, "npc_bulltank")) {
 		SDKHook(entity, SDKHook_Think, OnBulltankThink);
-		SDKHook(entity, SDKHook_SpawnPost, OnBulltankSpawn);
-		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnTakeDamage);
+		SDKHook(entity, SDKHook_Spawn, OnBulltankSpawn);
+		SDKHook(entity, SDKHook_OnTakeDamageAlive, OnNPCTakeDamage);
 	}
 }
 
@@ -195,27 +207,13 @@ public void OnEntityDestroyed(int entity)
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 	if(StrEqual(classname, "npc_bulltank") ||
-		StrEqual(classname, "npc_deadnaut") ||
-		StrEqual(classname, "npc_slasher")) {
+		StrEqual(classname, "npc_deadnaut")) {
 		base_npc_deleted(entity);
 	}
 }
 
 public void OnPluginEnd()
 {
-	int entity = -1;
-	while((entity = FindEntityByClassname(entity, "npc_bulltank")) != -1) {
-		base_npc_deleted(entity);
-		RemoveEntity(entity);
-	}
-	entity = -1;
-	while((entity = FindEntityByClassname(entity, "npc_deadnaut")) != -1) {
-		base_npc_deleted(entity);
-		RemoveEntity(entity);
-	}
-	entity = -1;
-	while((entity = FindEntityByClassname(entity, "npc_slasher")) != -1) {
-		base_npc_deleted(entity);
-		RemoveEntity(entity);
-	}
+	BulltankRemoveAll();
+	DeadnautRemoveAll();
 }

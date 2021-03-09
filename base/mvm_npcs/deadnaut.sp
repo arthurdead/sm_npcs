@@ -85,12 +85,12 @@ void deadnaut_precache(int entity, BaseAnimating anim)
 	deadnaut_anim_Land = anim.LookupSequence("Land");
 }
 
-int CreateDeadnaut(TFClassType class = TFClass_Unknown)
+int CreateDeadnaut(TFTeam team = TFTeam_Blue, TFClassType class = TFClass_Unknown)
 {
 	int entity = CreateEntityByName("npc_deadnaut");
 	SetEntProp(entity, Prop_Data, "m_iClass", class);
 	DispatchSpawn(entity);
-	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TFTeam_Blue);
+	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", team);
 	ActivateEntity(entity);
 	return entity;
 }
@@ -105,7 +105,7 @@ bool DeadnautPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList r
 {
 	TFClassType class = spawner.get_data("Class");
 
-	int entity = CreateDeadnaut(class);
+	int entity = CreateDeadnaut(TFTeam_Blue, class);
 
 	base_npc_pop_spawn(spawner, entity);
 
@@ -121,6 +121,8 @@ bool DeadnautPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList r
 void OnDeadnautSpawn(int entity)
 {
 	base_npc_spawn(entity);
+
+	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_MECH);
 
 	TFTeam team = GetEntityTFTeam(entity);
 	if(team == TFTeam_Blue) {
@@ -308,4 +310,13 @@ void OnDeadnautThink(int entity)
 	}
 
 	anim.StudioFrameAdvance();
+}
+
+void DeadnautRemoveAll()
+{
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, "npc_deadnaut")) != -1) {
+		base_npc_deleted(entity);
+		RemoveEntity(entity);
+	}
 }

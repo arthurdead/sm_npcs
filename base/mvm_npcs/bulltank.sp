@@ -55,15 +55,6 @@ void bulltank_precache(int entity, BaseAnimating anim)
 	bulltank_anim_Shell = anim.LookupSequence("Shell");
 }
 
-int CreateBulltank()
-{
-	int entity = CreateEntityByName("npc_bulltank");
-	DispatchSpawn(entity);
-	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TFTeam_Blue);
-	ActivateEntity(entity);
-	return entity;
-}
-
 bool BulltankPopParse(CustomPopulationSpawner spawner, KeyValues data)
 {
 	base_npc_pop_parse(spawner, data, bulltank_health.IntValue, true);
@@ -72,7 +63,7 @@ bool BulltankPopParse(CustomPopulationSpawner spawner, KeyValues data)
 
 bool BulltankPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
 {
-	int entity = CreateBulltank();
+	int entity = create_base_npc("npc_bulltank", TFTeam_Blue);
 
 	base_npc_pop_spawn(spawner, entity);
 
@@ -88,6 +79,11 @@ bool BulltankPopSpawn(CustomPopulationSpawner spawner, float pos[3], ArrayList r
 void OnBulltankSpawn(int entity)
 {
 	base_npc_spawn(entity);
+
+	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TFTeam_Blue);
+	SetEntProp(entity, Prop_Send, "m_iTeamNum", TFTeam_Blue);
+
+	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_MECH);
 
 	SetEntityModel(entity, "models/bulltank/bulltank_sequences.mdl");
 
@@ -179,5 +175,14 @@ void OnBulltankThink(int entity)
 
 			path.Update(bot);
 		}
+	}
+}
+
+void BulltankRemoveAll()
+{
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, "npc_bulltank")) != -1) {
+		base_npc_deleted(entity);
+		RemoveEntity(entity);
 	}
 }

@@ -16,12 +16,18 @@
 #define SOLID_BBOX 2
 #define SOLID_CUSTOM 5
 
+#define BLOOD_COLOR_RED 0
+#define BLOOD_COLOR_YELLOW 1
+#define BLOOD_COLOR_GREEN 2
 #define BLOOD_COLOR_MECH 3
 #define	DAMAGE_YES 2
 
 #define EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS (1 << 14)
 #define EFL_DIRTY_SPATIAL_PARTITION (1 << 15)
 #define EFL_DONTWALKON (1 << 26)
+
+#define ACT_IDLE 1
+#define ACT_WALK 6
 
 ConVar tf_bot_path_lookahead_range = null;
 ConVar base_npc_draw_hull = null;
@@ -43,16 +49,10 @@ void base_npc_spawn(int entity)
 {
 	SetEntProp(entity, Prop_Data, "m_lifeState", LIFE_ALIVE);
 	SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_YES);
-	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_MECH);
-
-	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TFTeam_Blue);
-	SetEntProp(entity, Prop_Send, "m_iTeamNum", TFTeam_Blue);
 
 	INextBot bot = INextBot(entity);
 	IBodyCustom body = bot.AllocateCustomBody();
 	bot.AllocateCustomLocomotion();
-
-	body.SolidMask = MASK_NPCSOLID|CONTENTS_PLAYERCLIP;
 
 	SetEntProp(entity, Prop_Send, "m_nSolidType", SOLID_BBOX);
 
@@ -64,14 +64,6 @@ void base_npc_spawn(int entity)
 
 	//setting any of these while the entity is in the MVM spawn zone makes it disapper very weird
 	/*
-	body.CollisionGroup = COLLISION_GROUP_NPC;
-
-	SetEntProp(entity, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_NPC);
-
-	flags = GetEntityFlags(entity);
-	flags |= FL_NPC;
-	SetEntityFlags(entity, flags);
-
 	SetEntProp(entity, Prop_Send, "m_nSurroundType", USE_ROTATION_EXPANDED_BOUNDS);
 
 	flags = GetEntProp(entity, Prop_Data, "m_iEFlags");
@@ -95,6 +87,15 @@ void base_npc_deleted(int entity)
 		delete path;
 	}
 	SetEntProp(entity, Prop_Data, "m_pPathFollower", 0);
+}
+
+int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
+{
+	int entity = CreateEntityByName(classname);
+	DispatchSpawn(entity);
+	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", team);
+	ActivateEntity(entity);
+	return entity;
 }
 
 void base_npc_set_hull(int entity, float width, float height)
@@ -244,6 +245,75 @@ int base_npc_pop_get_health(CustomPopulationSpawner spawner, int num)
 TFTeam GetEntityTFTeam(int entity)
 {
 	return view_as<TFTeam>(GetEntProp(entity, Prop_Data, "m_iTeamNum"));
+}
+
+TFTeam GetClientTFTeam(int client)
+{
+	return view_as<TFTeam>(GetClientTeam(client));
+}
+
+void base_npc_add_to_vision(int victim, int entity)
+{
+	INextBot bot = INextBot(victim);
+	IVision vision = bot.VisionInterface;
+	vision.AddKnownEntity(entity);
+}
+
+Action OnNPCTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
+{
+	base_npc_add_to_vision(victim, attacker);
+
+	return Plugin_Continue;
+}
+
+void FrameRemoveEntity(int entity)
+{
+	RemoveEntity(entity);
+}
+
+bool FindBombSite(float pos[3])
+{
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, "func_capturezone")) != -1) {
+		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
+		return true;
+	}
+	return false;
+}
+
+int FindFurthestTank()
+{
+	return -1;
+}
+
+int FindFurthestBulltank()
+{
+	return -1;
+}
+
+int FindFurthestBombPlayer()
+{
+	for(int i = 1; i <= MaxClients; ++i) {
+		if(IsClientInGame(i)) {
+			if(GetClientTFTeam(i) == TFTeam_Blue) {
+				
+			}
+		}
+	}
+
+	return -1;
+}
+
+int FindFurthestEscortTarget()
+{
+	int entity = FindFurthestTank();
+	if(entity == -1) {
+		entity = FindFurthestBulltank();
+	}
+	if(entity == -1) {
+		entity = FindFurthestBombPlayer();
+	}
+	return entity;
 }
 
 int g_iLaserBeamIndex = -1;
