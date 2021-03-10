@@ -252,30 +252,6 @@ TFTeam GetClientTFTeam(int client)
 	return view_as<TFTeam>(GetClientTeam(client));
 }
 
-void base_npc_add_to_vision(int victim, int entity)
-{
-	INextBot bot = INextBot(victim);
-	IVision vision = bot.VisionInterface;
-	vision.AddKnownEntity(entity);
-}
-
-int DamageRules_OnNPCTakeDamageAlive(int entity, CTakeDamageInfo info)
-{
-	int attacker = info.m_hAttacker;
-	if(attacker != -1) {
-		base_npc_add_to_vision(entity, attacker);
-	}
-
-	return baseline_ontakedamagealive(entity, info);
-}
-
-Action SDKHooks_OnNPCTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
-{
-	base_npc_add_to_vision(victim, attacker);
-
-	return Plugin_Continue;
-}
-
 void FrameRemoveEntity(int entity)
 {
 	RemoveEntity(entity);

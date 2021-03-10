@@ -7,7 +7,6 @@
 #include <nextbot>
 #include <animhelpers>
 #include <popspawner>
-#include <damagerules>
 
 #include "base/shared.sp"
 #include "base/hl2_npcs/shared.sp"
@@ -66,10 +65,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 {
 	if(StrEqual(classname, "npc_classiczombie")) {
 		SDKHook(entity, SDKHook_Think, OnClassicZombieThink);
-		SDKHook(entity, SDKHook_SpawnPost, OnClassicZombieSpawn);
-		//SDKHook(entity, SDKHook_OnTakeDamageAlive, SDKHooks_OnNPCTakeDamage);
-		SetEntityOnTakeDamage(entity, baseline_ontakedamage);
-		SetEntityOnTakeDamageAlive(entity, DamageRules_OnNPCTakeDamageAlive);
+		SDKHook(entity, SDKHook_Spawn, OnClassicZombieSpawn);
 	}
 }
 
