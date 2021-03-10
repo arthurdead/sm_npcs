@@ -4,6 +4,7 @@ enum ClassicZombieState
 	ClassicZombie_Dying,
 	ClassicZombie_Default,
 	ClassicZombie_Attacking,
+	ClassicZombie_FacingTarget,
 };
 
 ConVar classiczombie_health = null;
@@ -104,6 +105,12 @@ void OnClassicZombieSpawn(int entity)
 
 	anim.ResetSequence(sequence);
 	SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Spawning);
+
+	INextBot bot = INextBot(entity);
+	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
+
+	locomotion.DeathDropHeight = 10.0;
+	locomotion.MaxJumpHeight = 0.0;
 }
 
 void OnClassicZombieThink(int entity)
@@ -126,6 +133,25 @@ void OnClassicZombieThink(int entity)
 	INextBot bot = INextBot(entity);
 
 	switch(state) {
+		case ClassicZombie_FacingTarget: {
+			int target = EntRefToEntIndex(GetEntProp(entity, Prop_Data, "m_hTarget"));
+			if(IsValidEntity(target)) {
+				float target_pos[3];
+				GetEntPropVector(target, Prop_Data, "m_vecAbsOrigin", target_pos);
+
+				NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
+				locomotion.FaceTowards(target_pos);
+
+				IVision vision = bot.VisionInterface;
+				if(vision.IsInFieldOfViewEntity(target)) {
+					int sequence = anim.SelectWeightedSequence(ACT_MELEE_ATTACK1);
+					anim.ResetSequence(sequence);
+					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Attacking);
+				}
+			} else {
+				SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Default);
+			}
+		}
 		case ClassicZombie_Attacking: {
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Default);
@@ -156,10 +182,9 @@ void OnClassicZombieThink(int entity)
 
 				float distance = GetVectorDistance(my_pos, target_pos);
 				if(distance <= 50.0) {
-					int sequence = anim.SelectWeightedSequence(ACT_MELEE_ATTACK1);
+					int sequence = anim.SelectWeightedSequence(ACT_IDLE);
 					anim.ResetSequence(sequence);
-					locomotion.FaceTowards(target_pos);
-					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Attacking);
+					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_FacingTarget);
 					return;
 				}
 			}

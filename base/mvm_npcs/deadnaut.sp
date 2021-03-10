@@ -172,12 +172,10 @@ void OnDeadnautSpawn(int entity)
 
 	SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Spawning);
 
-	//INextBot bot = INextBot(entity);
-	//NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
+	INextBot bot = INextBot(entity);
+	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
 
-	//locomotion.DeathDropHeight = 99999999999.0;
-	//locomotion.MaxJumpHeight = 0.0;
-	//locomotion.StepHeight = 50.0;
+	locomotion.DeathDropHeight = 99999999999.0;
 
 	base_npc_set_hull(entity, 80.0, 200.0);
 }

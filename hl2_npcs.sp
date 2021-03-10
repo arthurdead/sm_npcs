@@ -21,11 +21,6 @@ public void OnPluginStart()
 	RegConsoleCmd("testzm", cmd);
 }
 
-bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
-{
-	return entity != data;
-}
-
 Action cmd(int client, int args)
 {
 	int entity = create_base_npc("npc_classiczombie");

@@ -125,9 +125,146 @@ void base_npc_set_hull(int entity, float width, float height)
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
 }
 
+bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
+{
+	return entity != data;
+}
+
+void base_npc_resolve_collisions(int entity)
+{
+	float npc_pos[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", npc_pos);
+
+	float npc_mins[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecMins", npc_mins);
+
+	float npc_maxs[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecMaxs", npc_maxs);
+
+	float npc_global_maxs[3];
+	AddVectors(npc_pos, npc_maxs, npc_global_maxs);
+
+	float npc_global_mins[3];
+	AddVectors(npc_pos, npc_mins, npc_global_mins);
+
+	float npc_center[3];
+	view_as<BaseEntity>(entity).WorldSpaceCenter(npc_center);
+
+	for(int i = 1; i <= MaxClients; ++i) {
+		if(!IsClientInGame(i) ||
+			!IsPlayerAlive(i)) {
+			continue;
+		}
+
+		float ply_pos[3];
+		GetClientAbsOrigin(i, ply_pos);
+
+		float ply_mins[3];
+		GetEntPropVector(i, Prop_Data, "m_vecMins", ply_mins);
+
+		float ply_maxs[3];
+		GetEntPropVector(i, Prop_Data, "m_vecMaxs", ply_maxs);
+
+		float plr_global_maxs[3];
+		AddVectors(ply_pos, ply_maxs, plr_global_maxs);
+
+		float plr_global_mins[3];
+		AddVectors(ply_pos, ply_mins, plr_global_mins);
+
+		if(plr_global_mins[0] > npc_global_maxs[0] ||
+			plr_global_maxs[0] < npc_global_mins[0] ||
+			plr_global_mins[1] > npc_global_maxs[1] ||
+			plr_global_maxs[1] < npc_global_mins[1] ||
+			plr_global_mins[2] > npc_global_maxs[2] ||
+			plr_global_maxs[2] < npc_global_mins[2]) {
+			continue;
+		}
+
+		float plr_center[3];
+		view_as<BaseEntity>(i).WorldSpaceCenter(plr_center);
+
+		float to_plr[3];
+		SubtractVectors(plr_center, npc_center, to_plr);
+
+		float overlap[3];
+
+		float signX = 0.0;
+		float signY = 0.0;
+		float signZ = 0.0;
+
+		if(to_plr[0] >= 0.0) {
+			overlap[0] = npc_global_maxs[0] - plr_global_mins[0];
+			signX = 1.0;
+		} else {
+			overlap[0] = plr_global_maxs[0] - npc_global_mins[0];
+			signX = -1.0;
+		}
+
+		if(to_plr[1] >= 0.0) {
+			overlap[1] = npc_global_maxs[1] - plr_global_mins[1];
+			signY = 1.0;
+		} else {
+			overlap[1] = plr_global_maxs[1] - npc_global_mins[1];
+			signY = -1.0;
+		}
+
+		if(to_plr[2] >= 0.0) {
+			overlap[2] = npc_global_maxs[2] - plr_global_mins[2];
+			signZ = 1.0;
+		} else {
+			overlap[2] = 99999.9;
+			signZ = -1.0;
+		}
+
+		float bloat = 5.0;
+
+		float plr_new_pos[3];
+		plr_new_pos[0] = ply_pos[0];
+		plr_new_pos[1] = ply_pos[1];
+		plr_new_pos[2] = ply_pos[2];
+
+		if(overlap[0] < overlap[1]) {
+			if(overlap[0] < overlap[2]) {
+				plr_new_pos[0] += signX * (overlap[0] + bloat);
+			} else {
+				plr_new_pos[2] += signZ * (overlap[2] + bloat);
+			}
+		} else if(overlap[2] < overlap[1]) {
+			plr_new_pos[2] += signZ * (overlap[2] + bloat);
+		} else {
+			plr_new_pos[1] += signY * (overlap[1] + bloat);
+		}
+
+		Handle trace = TR_TraceHullFilterEx(plr_new_pos, plr_new_pos, ply_mins, ply_maxs, MASK_PLAYERSOLID, TraceEntityFilter_DontHitEntity, i);
+		bool hit = TR_DidHit(trace);
+		delete trace;
+
+		if(hit) {
+			float tmp_pos[3];
+			tmp_pos[0] = plr_new_pos[0];
+			tmp_pos[1] = plr_new_pos[1];
+			tmp_pos[2] = plr_new_pos[2] + 32.0;
+			trace = TR_TraceHullFilterEx(tmp_pos, plr_new_pos, ply_mins, ply_maxs, MASK_PLAYERSOLID, TraceEntityFilter_DontHitEntity, i);
+			bool solid = TR_StartSolid(trace);
+
+			if(solid) {
+				//TakeDamage
+				delete trace;
+				continue;
+			} else {
+				TR_GetEndPosition(plr_new_pos, trace);
+			}
+
+			delete trace;
+		}
+
+		view_as<BaseEntity>(i).SetAbsOrigin(plr_new_pos);
+	}
+}
+
 void base_npc_think(int entity)
 {
-	
+	base_npc_resolve_collisions(entity);
 
 	if(base_npc_draw_hull.BoolValue) {
 		float pos[3];
