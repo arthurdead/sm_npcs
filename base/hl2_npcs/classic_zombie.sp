@@ -96,6 +96,8 @@ void OnClassicZombieSpawn(int entity)
 
 	BaseAnimating anim = BaseAnimating(entity);
 
+	anim.SetHandleAnimEvent(ClassicZombieHandleAnimEvent);
+
 	int i = GetRandomInt(0, sizeof(spawnanims)-1);
 	int sequence = anim.LookupSequence(spawnanims[i]);
 
@@ -103,7 +105,7 @@ void OnClassicZombieSpawn(int entity)
 		ACT_ZOM_RELEASECRAB = anim.LookupActivity("ACT_ZOM_RELEASECRAB");
 	}
 
-	anim.ResetSequence(sequence);
+	anim.ResetSequenceEx(sequence);
 	SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Spawning);
 
 	INextBot bot = INextBot(entity);
@@ -111,6 +113,12 @@ void OnClassicZombieSpawn(int entity)
 
 	locomotion.DeathDropHeight = 10.0;
 	locomotion.MaxJumpHeight = 0.0;
+}
+
+Action ClassicZombieHandleAnimEvent(BaseAnimating anim, animevent_t event, any data)
+{
+	PrintToServer("ClassicZombieHandleAnimEvent %i, %s", event.event, event.options);
+	return Plugin_Handled;
 }
 
 void OnClassicZombieThink(int entity)
@@ -123,8 +131,8 @@ void OnClassicZombieThink(int entity)
 
 	if(state != ClassicZombie_Dying) {
 		if(GetEntProp(entity, Prop_Data, "m_lifeState") == LIFE_DYING) {
-			int sequence = anim.SelectWeightedSequence(ACT_ZOM_RELEASECRAB);
-			anim.ResetSequence(sequence);
+			int sequence = anim.SelectWeightedSequenceEx(ACT_ZOM_RELEASECRAB);
+			anim.ResetSequenceEx(sequence);
 			SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Dying);
 			return;
 		}
@@ -144,8 +152,8 @@ void OnClassicZombieThink(int entity)
 
 				IVision vision = bot.VisionInterface;
 				if(vision.IsInFieldOfViewEntity(target)) {
-					int sequence = anim.SelectWeightedSequence(ACT_MELEE_ATTACK1);
-					anim.ResetSequence(sequence);
+					int sequence = anim.SelectWeightedSequenceEx(ACT_MELEE_ATTACK1);
+					anim.ResetSequenceEx(sequence);
 					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_Attacking);
 				}
 			} else {
@@ -182,8 +190,8 @@ void OnClassicZombieThink(int entity)
 
 				float distance = GetVectorDistance(my_pos, target_pos);
 				if(distance <= 50.0) {
-					int sequence = anim.SelectWeightedSequence(ACT_IDLE);
-					anim.ResetSequence(sequence);
+					int sequence = anim.SelectWeightedSequenceEx(ACT_IDLE);
+					anim.ResetSequenceEx(sequence);
 					SetEntProp(entity, Prop_Data, "m_nState", ClassicZombie_FacingTarget);
 					return;
 				}
@@ -213,17 +221,18 @@ void OnClassicZombieThink(int entity)
 			}
 
 			if(GetEntPropFloat(entity, Prop_Data, "m_flRecalcWalkAnim") <= GetGameTime()) {
-				SetEntProp(entity, Prop_Data, "m_nWalkAnim", anim.SelectWeightedSequence(ACT_WALK));
+				int sequence = anim.SelectWeightedSequenceEx(ACT_WALK);
+				SetEntProp(entity, Prop_Data, "m_nWalkAnim", sequence);
 				SetEntPropFloat(entity, Prop_Data, "m_flRecalcWalkAnim", GetGameTime() + GetRandomFloat(1.0, 3.0));
 			}
 
-			int sequence = anim.SelectWeightedSequence(ACT_IDLE);
+			int sequence = anim.SelectWeightedSequenceEx(ACT_IDLE);
 			float speed = locomotion.GroundSpeed;
 			if(speed > 1.0) {
 				sequence = GetEntProp(entity, Prop_Data, "m_nWalkAnim");
 			}
 
-			anim.ResetSequence(sequence);
+			anim.ResetSequenceEx(sequence);
 
 			float m_flGroundSpeed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
 			if(m_flGroundSpeed == 0.0) {
@@ -238,4 +247,5 @@ void OnClassicZombieThink(int entity)
 	}
 
 	anim.StudioFrameAdvance();
+	anim.DispatchAnimEvents();
 }

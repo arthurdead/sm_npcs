@@ -115,21 +115,21 @@ void OnBulltankThink(int entity)
 
 	switch(state) {
 		case Bulltank_Firing: {
-			anim.ResetSequence(bulltank_anim_Shell);
+			anim.ResetSequenceEx(bulltank_anim_Shell);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntProp(entity, Prop_Data, "m_nState", Bulltank_Default);
 			}
 		}
 		case Bulltank_Dying: {
-			anim.ResetSequence(bulltank_anim_Shell2);
+			anim.ResetSequenceEx(bulltank_anim_Shell2);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				RequestFrame(FrameRemoveEntity, entity);
 			}
 		}
 		case Bulltank_Spawning: {
-			anim.ResetSequence(bulltank_anim_ShellUp);
+			anim.ResetSequenceEx(bulltank_anim_ShellUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntProp(entity, Prop_Data, "m_nState", Bulltank_Default);
@@ -168,7 +168,7 @@ void OnBulltankThink(int entity)
 				sequence = bulltank_anim_Walk;
 			}
 
-			anim.ResetSequence(sequence);
+			anim.ResetSequenceEx(sequence);
 
 			locomotion.RunSpeed = m_flGroundSpeed;
 			locomotion.WalkSpeed = m_flGroundSpeed;

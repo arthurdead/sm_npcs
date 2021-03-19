@@ -33,11 +33,6 @@ public void OnPluginStart()
 	RegConsoleCmd("testmvm6", cmd6);
 }
 
-bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
-{
-	return entity != data;
-}
-
 Action cmd3(int client, int args)
 {
 	int entity = -1;

@@ -215,7 +215,7 @@ void OnDeadnautThink(int entity)
 
 	switch(state) {
 		case Deadnaut_Landing: {
-			anim.ResetSequence(deadnaut_anim_Land);
+			anim.ResetSequenceEx(deadnaut_anim_Land);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Default);
@@ -228,14 +228,14 @@ void OnDeadnautThink(int entity)
 			return;
 		}
 		case Deadnaut_Dying: {
-			anim.ResetSequence(deadnaut_anim_Brace);
+			anim.ResetSequenceEx(deadnaut_anim_Brace);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				RequestFrame(FrameRemoveEntity, entity);
 			}
 		}
 		case Deadnaut_Spawning: {
-			anim.ResetSequence(deadnaut_anim_StandUp);
+			anim.ResetSequenceEx(deadnaut_anim_StandUp);
 
 			if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
 				SetEntProp(entity, Prop_Data, "m_nState", Deadnaut_Default);
@@ -298,7 +298,7 @@ void OnDeadnautThink(int entity)
 				}
 			}
 
-			anim.ResetSequence(sequence);
+			anim.ResetSequenceEx(sequence);
 
 			locomotion.RunSpeed = m_flGroundSpeed;
 			locomotion.WalkSpeed = m_flGroundSpeed;
