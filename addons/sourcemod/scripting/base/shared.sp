@@ -1,3 +1,7 @@
+#include <datamaps>
+#include <animhelpers>
+#include <nextbot>
+
 #define EF_BONEMERGE 0x001
 #define EF_BONEMERGE_FASTCULL 0x080
 #define EF_PARENT_ANIMATES 0x200
@@ -29,13 +33,16 @@
 ConVar tf_bot_path_lookahead_range = null;
 ConVar base_npc_draw_hull = null;
 
-void base_npc_init()
+stock void base_npc_init()
 {
 	tf_bot_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
-	base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "1");
+	base_npc_draw_hull = FindConVar("base_npc_draw_hull");
+	if(base_npc_draw_hull == null) {
+		base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "1");
+	}
 }
 
-void base_npc_init_datamaps(CustomDatamap datamap)
+stock void base_npc_init_datamaps(CustomDatamap datamap)
 {
 	datamap.add_prop("m_pPathFollower", custom_prop_int);
 	datamap.add_prop("m_flRepathTime", custom_prop_float);
@@ -43,7 +50,7 @@ void base_npc_init_datamaps(CustomDatamap datamap)
 	datamap.add_prop("m_hTarget", custom_prop_int);
 }
 
-void base_npc_spawn(int entity)
+stock void base_npc_spawn(int entity)
 {
 	SetEntProp(entity, Prop_Data, "m_lifeState", LIFE_ALIVE);
 	SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_YES);
@@ -78,16 +85,21 @@ void base_npc_spawn(int entity)
 	SetEntProp(entity, Prop_Data, "m_pPathFollower", path);
 }
 
-void base_npc_deleted(int entity)
+stock PathFollower get_npc_path(int entity)
 {
-	PathFollower path = GetEntProp(entity, Prop_Data, "m_pPathFollower");
+	return view_as<PathFollower>(GetEntProp(entity, Prop_Data, "m_pPathFollower"));
+}
+
+stock void base_npc_deleted(int entity)
+{
+	PathFollower path = get_npc_path(entity);
 	if(path != null) {
 		delete path;
 	}
 	SetEntProp(entity, Prop_Data, "m_pPathFollower", 0);
 }
 
-int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
+stock int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
 {
 	int entity = CreateEntityByName(classname);
 	DispatchSpawn(entity);
@@ -96,7 +108,7 @@ int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
 	return entity;
 }
 
-void base_npc_set_hull(int entity, float width, float height)
+stock void base_npc_set_hull(int entity, float width, float height)
 {
 	float m_flModelScale = GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
 
@@ -125,12 +137,12 @@ void base_npc_set_hull(int entity, float width, float height)
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
 }
 
-bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
+stock bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
 {
 	return entity != data;
 }
 
-void base_npc_resolve_collisions(int entity)
+stock void base_npc_resolve_collisions(int entity)
 {
 	float npc_pos[3];
 	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", npc_pos);
@@ -262,7 +274,7 @@ void base_npc_resolve_collisions(int entity)
 	}
 }
 
-void base_npc_think(int entity)
+stock void base_npc_think(int entity)
 {
 	base_npc_resolve_collisions(entity);
 
@@ -293,7 +305,7 @@ void base_npc_think(int entity)
 	}
 }
 
-void TypeToClassname(TFClassType type, char[] str, int len)
+stock void TypeToClassname(TFClassType type, char[] str, int len)
 {
 	switch(type) {
 		case TFClass_Heavy: { strcopy(str, len, "heavy"); }
@@ -308,7 +320,8 @@ void TypeToClassname(TFClassType type, char[] str, int len)
 	}
 }
 
-void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int defhealth, bool defminiboss = false)
+#if defined popspawner_included
+stock void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int defhealth, bool defminiboss = false)
 {
 	int health = data.GetNum("Health", defhealth);
 	float scale = data.GetFloat("ModelScale", 1.0);
@@ -328,12 +341,12 @@ void base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data, int def
 	spawner.set_data("MiniBoss", miniboss);
 }
 
-bool base_npc_pop_isminiboss(CustomPopulationSpawner spawner, int num)
+stock bool base_npc_pop_isminiboss(CustomPopulationSpawner spawner, int num)
 {
 	return spawner.get_data("MiniBoss");
 }
 
-bool base_npc_pop_getclassicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+stock bool base_npc_pop_getclassicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
 {
 	TFClassType class = spawner.get_data("Class");
 	if(class == TFClass_Unknown) {
@@ -344,12 +357,12 @@ bool base_npc_pop_getclassicon(CustomPopulationSpawner spawner, int num, char[] 
 	return true;
 }
 
-int base_npc_pop_getclass(CustomPopulationSpawner spawner, int num)
+stock int base_npc_pop_getclass(CustomPopulationSpawner spawner, int num)
 {
 	return spawner.get_data("Class");
 }
 
-bool base_npc_pop_hasattribute(CustomPopulationSpawner spawner, AttributeType attr, int num)
+stock bool base_npc_pop_hasattribute(CustomPopulationSpawner spawner, AttributeType attr, int num)
 {
 	if(attr & (IGNORE_FLAG|IS_NPC|REMOVE_ON_DEATH)) {
 		return true;
@@ -364,7 +377,7 @@ bool base_npc_pop_hasattribute(CustomPopulationSpawner spawner, AttributeType at
 	return false;
 }
 
-void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)
+stock void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)
 {
 	int health = spawner.get_data("Health");
 	float scale = spawner.get_data("Scale");
@@ -374,27 +387,28 @@ void base_npc_pop_spawn(CustomPopulationSpawner spawner, int entity)
 	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", scale);
 }
 
-int base_npc_pop_get_health(CustomPopulationSpawner spawner, int num)
+stock int base_npc_pop_get_health(CustomPopulationSpawner spawner, int num)
 {
 	return spawner.get_data("Health");
 }
+#endif
 
-TFTeam GetEntityTFTeam(int entity)
+stock TFTeam GetEntityTFTeam(int entity)
 {
 	return view_as<TFTeam>(GetEntProp(entity, Prop_Data, "m_iTeamNum"));
 }
 
-TFTeam GetClientTFTeam(int client)
+stock TFTeam GetClientTFTeam(int client)
 {
 	return view_as<TFTeam>(GetClientTeam(client));
 }
 
-void FrameRemoveEntity(int entity)
+stock void FrameRemoveEntity(int entity)
 {
 	RemoveEntity(entity);
 }
 
-bool FindBombSite(float pos[3])
+stock bool FindBombSite(float pos[3])
 {
 	int entity = -1;
 	while((entity = FindEntityByClassname(entity, "func_capturezone")) != -1) {
@@ -404,17 +418,17 @@ bool FindBombSite(float pos[3])
 	return false;
 }
 
-int FindFurthestTank()
+stock int FindFurthestTank()
 {
 	return -1;
 }
 
-int FindFurthestBulltank()
+stock int FindFurthestBulltank()
 {
 	return -1;
 }
 
-int FindFurthestBombPlayer()
+stock int FindFurthestBombPlayer()
 {
 	for(int i = 1; i <= MaxClients; ++i) {
 		if(IsClientInGame(i)) {
@@ -427,7 +441,7 @@ int FindFurthestBombPlayer()
 	return -1;
 }
 
-int FindFurthestEscortTarget()
+stock int FindFurthestEscortTarget()
 {
 	int entity = FindFurthestTank();
 	if(entity == -1) {
@@ -443,7 +457,7 @@ int g_iLaserBeamIndex = -1;
 float drawlifetime = 0.1;
 int drawcolor[4] = {255, 0, 0, 255};
 
-void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const float mins[3]={-16.0, -16.0, 0.0}, const float maxs[3]={16.0, 16.0, 72.0})
+stock void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const float mins[3]={-16.0, -16.0, 0.0}, const float maxs[3]={16.0, 16.0, 72.0})
 {
 	if(g_iLaserBeamIndex == -1)
 	{

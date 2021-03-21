@@ -115,9 +115,23 @@ void OnClassicZombieSpawn(int entity)
 	locomotion.MaxJumpHeight = 0.0;
 }
 
+#define CLASSICZOMBIE_AE_LEFT_CLAW 54
+#define CLASSICZOMBIE_AE_RIGHT_CLAW 58
+#define CLASSICZOMBIE_AE_BOTH_CLAWS 60
+
 Action ClassicZombieHandleAnimEvent(BaseAnimating anim, animevent_t event, any data)
 {
-	PrintToServer("ClassicZombieHandleAnimEvent %i, %s", event.event, event.options);
+	switch(event.event) {
+		case CLASSICZOMBIE_AE_LEFT_CLAW: {
+			
+		}
+		case CLASSICZOMBIE_AE_RIGHT_CLAW: {
+			
+		}
+		case CLASSICZOMBIE_AE_BOTH_CLAWS: {
+			
+		}
+	}
 	return Plugin_Handled;
 }
 

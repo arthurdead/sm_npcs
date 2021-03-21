@@ -1,0 +1,36 @@
+"Games"
+{
+	"tf"
+	{
+		"Offsets"
+		{
+			"sizeof(CBaseObject)"
+			{
+				"linux" "2928"
+			}
+			"CBaseObject::GetBaseHealth"
+			{
+				"linux" "380"
+			}
+		}
+		"Signatures"
+		{
+			"CBaseObject::CBaseObject"
+			{
+				"library" "server"
+				"linux" "@_ZN11CBaseObjectC1Ev"
+			}
+		}
+		"Functions"
+		{
+			"CBaseObject::GetBaseHealth"
+			{
+				"offset" "CBaseObject::GetBaseHealth"
+				"callconv" "thiscall"
+				"return" "int"
+				"this" "entity"
+				"hooktype" "entity"
+			}
+		}
+	}
+}
