@@ -38,7 +38,7 @@ stock void base_npc_init()
 	tf_bot_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
 	base_npc_draw_hull = FindConVar("base_npc_draw_hull");
 	if(base_npc_draw_hull == null) {
-		base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "1");
+		base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "0");
 	}
 }
 
