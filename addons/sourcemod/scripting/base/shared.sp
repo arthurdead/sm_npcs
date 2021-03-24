@@ -44,7 +44,7 @@ stock void base_npc_init()
 
 stock void base_npc_init_datamaps(CustomDatamap datamap)
 {
-	datamap.add_prop("m_pPathFollower", custom_prop_int);
+	datamap.add_prop("m_pChasePath", custom_prop_int);
 	datamap.add_prop("m_flRepathTime", custom_prop_float);
 	datamap.add_prop("m_nState", custom_prop_int);
 	datamap.add_prop("m_hTarget", custom_prop_int);
@@ -80,23 +80,23 @@ stock void base_npc_spawn(int entity)
 	SetEntProp(entity, Prop_Send, "m_usSolidFlags", flags);
 	*/
 
-	PathFollower path = new PathFollower();
+	ChasePath path = new ChasePath(LEAD_SUBJECT);
 	path.MinLookAheadDistance = tf_bot_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
-	SetEntProp(entity, Prop_Data, "m_pPathFollower", path);
+	SetEntProp(entity, Prop_Data, "m_pChasePath", path);
 }
 
-stock PathFollower get_npc_path(int entity)
+stock ChasePath get_npc_path(int entity)
 {
-	return view_as<PathFollower>(GetEntProp(entity, Prop_Data, "m_pPathFollower"));
+	return view_as<ChasePath>(GetEntProp(entity, Prop_Data, "m_pChasePath"));
 }
 
 stock void base_npc_deleted(int entity)
 {
-	PathFollower path = get_npc_path(entity);
+	ChasePath path = get_npc_path(entity);
 	if(path != null) {
 		delete path;
 	}
-	SetEntProp(entity, Prop_Data, "m_pPathFollower", 0);
+	SetEntProp(entity, Prop_Data, "m_pChasePath", 0);
 }
 
 stock int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
