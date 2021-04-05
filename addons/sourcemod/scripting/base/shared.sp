@@ -2,86 +2,42 @@
 #include <animhelpers>
 #include <nextbot>
 
-#define EF_BONEMERGE 0x001
-#define EF_BONEMERGE_FASTCULL 0x080
-#define EF_PARENT_ANIMATES 0x200
-#define EF_NODRAW 0x020
-#define EF_NOSHADOW 0x010
-#define EF_NORECEIVESHADOW 0x040
-
-#define COLLISION_GROUP_NPC 9
-#define LIFE_ALIVE 0
 #define LIFE_DYING 1
-
-#define FSOLID_NOT_STANDABLE 0x0010
-
-#define USE_ROTATION_EXPANDED_BOUNDS 5
-#define SOLID_VPHYSICS 6
-#define SOLID_BBOX 2
-#define SOLID_CUSTOM 5
 
 #define BLOOD_COLOR_RED 0
 #define BLOOD_COLOR_YELLOW 1
 #define BLOOD_COLOR_GREEN 2
 #define BLOOD_COLOR_MECH 3
-#define	DAMAGE_YES 2
 
-#define EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS (1 << 14)
-#define EFL_DIRTY_SPATIAL_PARTITION (1 << 15)
-#define EFL_DONTWALKON (1 << 26)
-
-ConVar tf_bot_path_lookahead_range = null;
-ConVar base_npc_draw_hull = null;
+ConVar base_npc_path_lookahead_range = null;
 
 stock void base_npc_init()
 {
-	tf_bot_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
-	base_npc_draw_hull = FindConVar("base_npc_draw_hull");
-	if(base_npc_draw_hull == null) {
-		base_npc_draw_hull = CreateConVar("base_npc_draw_hull", "0");
-	}
+#if defined GAME_TF2
+	base_npc_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
+#elseif defined GAME_L4D2
+	base_npc_path_lookahead_range = FindConVar("z_jockey_lookahead");
+#endif
 }
 
 stock void base_npc_init_datamaps(CustomDatamap datamap)
 {
 	datamap.add_prop("m_pChasePath", custom_prop_int);
-	datamap.add_prop("m_flRepathTime", custom_prop_float);
+	datamap.add_prop("m_flRepathTime", custom_prop_time);
 	datamap.add_prop("m_nState", custom_prop_int);
-	datamap.add_prop("m_hTarget", custom_prop_int);
+	datamap.add_prop("m_hTarget", custom_prop_ehandle);
 }
 
 stock void base_npc_spawn(int entity)
 {
-	SetEntProp(entity, Prop_Data, "m_lifeState", LIFE_ALIVE);
-	SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_YES);
-
 	INextBot bot = INextBot(entity);
+	bot.StubIntention();
 	bot.AllocateCustomBody();
 	bot.AllocateCustomLocomotion();
-
-	SetEntProp(entity, Prop_Send, "m_nSolidType", SOLID_BBOX);
-
-	int flags = GetEdictFlags(entity);
-	flags |= FL_EDICT_DIRTY_PVS_INFORMATION;
-	SetEdictFlags(entity, flags);
-
-	SetEntityMoveType(entity, MOVETYPE_CUSTOM);
-
-	//setting any of these while the entity is in the MVM spawn zone makes it disapper very weird
-	/*
-	SetEntProp(entity, Prop_Send, "m_nSurroundType", USE_ROTATION_EXPANDED_BOUNDS);
-
-	flags = GetEntProp(entity, Prop_Data, "m_iEFlags");
-	flags |= EFL_DIRTY_SURROUNDING_COLLISION_BOUNDS|EFL_DIRTY_SPATIAL_PARTITION;
-	SetEntProp(entity, Prop_Data, "m_iEFlags", flags);
-
-	flags = GetEntProp(entity, Prop_Send, "m_usSolidFlags");
-	flags |= FSOLID_NOT_STANDABLE;
-	SetEntProp(entity, Prop_Send, "m_usSolidFlags", flags);
-	*/
+	bot.AllocateCustomVision();
 
 	ChasePath path = new ChasePath(LEAD_SUBJECT);
-	path.MinLookAheadDistance = tf_bot_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
+	path.MinLookAheadDistance = base_npc_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
 	SetEntProp(entity, Prop_Data, "m_pChasePath", path);
 }
 
@@ -99,7 +55,7 @@ stock void base_npc_deleted(int entity)
 	SetEntProp(entity, Prop_Data, "m_pChasePath", 0);
 }
 
-stock int create_base_npc(const char[] classname, TFTeam team = TFTeam_Unassigned)
+stock int create_base_npc(const char[] classname, int team = 0)
 {
 	int entity = CreateEntityByName(classname);
 	DispatchSpawn(entity);
@@ -274,18 +230,17 @@ stock void base_npc_resolve_collisions(int entity)
 	}
 }
 
-stock void base_npc_think(int entity)
+stock void base_npc_think(int entity, INextBot bot)
 {
 	base_npc_resolve_collisions(entity);
 
-	if(base_npc_draw_hull.BoolValue) {
+	if(bot.IsDebugging(NEXTBOT_LOCOMOTION)) {
 		float pos[3];
 		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
 
 		float ang[3];
 		GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
 
-		INextBot bot = INextBot(entity);
 		IBody body = bot.BodyInterface;
 
 		float HullWidth = body.HullWidth;
@@ -305,6 +260,7 @@ stock void base_npc_think(int entity)
 	}
 }
 
+#if defined GAME_TF2
 stock void TypeToClassname(TFClassType type, char[] str, int len)
 {
 	switch(type) {
@@ -393,21 +349,6 @@ stock int base_npc_pop_get_health(CustomPopulationSpawner spawner, int num)
 }
 #endif
 
-stock TFTeam GetEntityTFTeam(int entity)
-{
-	return view_as<TFTeam>(GetEntProp(entity, Prop_Data, "m_iTeamNum"));
-}
-
-stock TFTeam GetClientTFTeam(int client)
-{
-	return view_as<TFTeam>(GetClientTeam(client));
-}
-
-stock void FrameRemoveEntity(int entity)
-{
-	RemoveEntity(entity);
-}
-
 stock bool FindBombSite(float pos[3])
 {
 	int entity = -1;
@@ -451,6 +392,12 @@ stock int FindFurthestEscortTarget()
 		entity = FindFurthestBombPlayer();
 	}
 	return entity;
+}
+#endif
+
+stock void FrameRemoveEntity(int entity)
+{
+	RemoveEntity(entity);
 }
 
 int g_iLaserBeamIndex = -1;
