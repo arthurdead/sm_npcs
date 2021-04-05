@@ -31,7 +31,6 @@ stock void base_npc_init_datamaps(CustomDatamap datamap)
 stock void base_npc_spawn(int entity)
 {
 	INextBot bot = INextBot(entity);
-	bot.StubIntention();
 	bot.AllocateCustomBody();
 	bot.AllocateCustomLocomotion();
 	bot.AllocateCustomVision();
@@ -402,9 +401,8 @@ stock void FrameRemoveEntity(int entity)
 
 int g_iLaserBeamIndex = -1;
 float drawlifetime = 0.1;
-int drawcolor[4] = {255, 0, 0, 255};
 
-stock void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const float mins[3]={-16.0, -16.0, 0.0}, const float maxs[3]={16.0, 16.0, 72.0})
+stock void DrawHull(const float origin[3], const float angles[3]=NULL_VECTOR, const float mins[3]={-16.0, -16.0, 0.0}, const float maxs[3]={16.0, 16.0, 72.0}, int drawcolor[4] = {255, 0, 0, 255})
 {
 	if(g_iLaserBeamIndex == -1)
 	{
