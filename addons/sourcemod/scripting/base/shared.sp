@@ -9,6 +9,8 @@
 #define BLOOD_COLOR_GREEN 2
 #define BLOOD_COLOR_MECH 3
 
+#define HIDEHUD_BONUS_PROGRESS (1 << 11)
+
 ConVar base_npc_path_lookahead_range = null;
 
 stock void base_npc_init()
@@ -28,7 +30,7 @@ stock void base_npc_init_datamaps(CustomDatamap datamap)
 	datamap.add_prop("m_hTarget", custom_prop_ehandle);
 }
 
-stock void base_npc_spawn(int entity)
+stock void base_npc_spawn(int entity, IIntentionCustom inte = IIntentionCustom_Null)
 {
 	INextBot bot = INextBot(entity);
 	bot.AllocateCustomBody();
@@ -398,6 +400,39 @@ stock void FrameRemoveEntity(int entity)
 {
 	RemoveEntity(entity);
 }
+
+void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float offset[3])
+{
+	float vecForward[3]; float vecLeft[3]; float vecUp[3];
+	GetAngleVectors(angle, vecForward, vecLeft, vecUp);
+
+	ScaleVector(vecForward, offset[0]);
+	ScaleVector(vecLeft, offset[1]);
+	ScaleVector(vecUp, offset[2]);
+
+	float vecAdd[3];
+	AddVectors(vecAdd, vecForward, vecAdd);
+	AddVectors(vecAdd, vecLeft, vecAdd);
+	AddVectors(vecAdd, vecUp, vecAdd);
+
+	AddVectors(buffer, vecAdd, buffer);
+}
+
+#if defined GAME_L4D2
+bool L4D2_IsSurvivorBusy(int client)
+{
+	return GetEntityFlags(client) & FL_FROZEN || 
+		GetEntProp(client, Prop_Send, "m_iHideHUD") & ~HIDEHUD_BONUS_PROGRESS || 
+		GetEntProp(client, Prop_Send, "m_isIncapacitated") > 0 || 
+		//GetEntProp(client, Prop_Send, "m_knockdownReason") > 0 || 
+		GetEntPropFloat(client, Prop_Send, "m_staggerDist") > 0.0 || 
+		GetEntPropEnt(client, Prop_Send, "m_pummelAttacker") > 0 || 
+		GetEntPropEnt(client, Prop_Send, "m_carryAttacker") > 0 || 
+		GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0 || 
+		GetEntPropEnt(client, Prop_Send, "m_jockeyAttacker") > 0 || 
+		GetEntPropEnt(client, Prop_Send, "m_tongueOwner") > 0;
+}
+#endif
 
 int g_iLaserBeamIndex = -1;
 float drawlifetime = 0.1;

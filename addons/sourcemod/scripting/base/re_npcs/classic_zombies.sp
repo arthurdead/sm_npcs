@@ -39,7 +39,7 @@ void classiczombie_init()
 }
 
 #if defined GAME_L4D2
-public void re_classiczombie_precache(infected_class class, char data[MAX_DATA_LENGTH])
+public void re_classiczombie_precache(moreinfected_data data)
 {
 	for(int i = 0; i < sizeof(classiczombie_models); ++i) {
 		PrecacheModel(classiczombie_models[i]);
@@ -48,7 +48,7 @@ public void re_classiczombie_precache(infected_class class, char data[MAX_DATA_L
 	g_nAttackAnim = 34;
 }
 
-public int re_classiczombie_spawn(int entity, Address area, float pos[3], infected_directive directive, infected_class class, char data[MAX_DATA_LENGTH])
+public int re_classiczombie_spawn_common(int entity, Address area, float pos[3], infected_directive directive, moreinfected_data data)
 {
 	RemoveEntity(entity);
 

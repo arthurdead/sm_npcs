@@ -34,11 +34,17 @@ Action cmd(int client, int args)
 
 	delete trace;
 
-	PrecacheModel("models/roach/redc/ety1.mdl");
+	moreinfected_data data;
+	re_tyrant_precache(data);
 
 	int entity = create_base_npc("npc_re_tyrant", 3);
 
 	TeleportEntity(entity, end);
+
+	PrintToServer("%f", GetEntPropFloat(client, Prop_Send, "m_staggerDist"));
+	PrintToServer("%i", GetEntProp(client, Prop_Send, "m_knockdownReason"));
+
+	SetEntProp(client, Prop_Send, "m_knockdownReason", 0);
 
 	return Plugin_Handled;
 }
