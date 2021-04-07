@@ -17,34 +17,50 @@ public void OnPluginStart()
 	tyrant_init();
 
 	RegConsoleCmd("testre", cmd);
+
+	CustomSendtable table = null;
+	CustomEntityFactory factory = register_infected_factory("testinfected", table);
+	table.set_name("DT_TestInfected");
+	table.set_network_name("CTestInfected");
+	//table.override_with("NextBotCombatCharacter");
 }
 
 Action cmd(int client, int args)
 {
-	float origin[3];
-	GetClientEyePosition(client, origin);
-
-	float angles[3];
-	GetClientEyeAngles(client, angles);
-
-	Handle trace = TR_TraceRayFilterEx(origin, angles, MASK_SOLID, RayType_Infinite, TraceEntityFilter_DontHitEntity, client);
-
 	float end[3];
-	TR_GetEndPosition(end, trace);
+	end[0] = 1842.788208;
+	end[1] = 2050.267578;
+	end[2] = 68.982697;
 
-	delete trace;
+	if(client != 0) {
+		float origin[3];
+		GetClientEyePosition(client, origin);
+
+		float angles[3];
+		GetClientEyeAngles(client, angles);
+
+		Handle trace = TR_TraceRayFilterEx(origin, angles, MASK_SOLID, RayType_Infinite, TraceEntityFilter_DontHitEntity, client);
+
+		TR_GetEndPosition(end, trace);
+
+		delete trace;
+	}
 
 	moreinfected_data data;
 	re_tyrant_precache(data);
 
-	int entity = create_base_npc("npc_re_tyrant", 3);
+	int entity = entity = CreateEntityByName("testinfected");
+	PrintToServer("%i", entity);
+	DispatchSpawn(entity);
+
+	SetEntityRenderMode(entity, RENDER_TRANSCOLOR);
+	SetEntityRenderFx(entity, RENDERFX_HOLOGRAM);
+	SetEntityRenderColor(entity, 255, 0, 0);
+
+	PrecacheModel("models/re2/re2zombie_officer.mdl");
+	SetEntityModel(entity, "models/re2/re2zombie_officer.mdl");
 
 	TeleportEntity(entity, end);
-
-	PrintToServer("%f", GetEntPropFloat(client, Prop_Send, "m_staggerDist"));
-	PrintToServer("%i", GetEntProp(client, Prop_Send, "m_knockdownReason"));
-
-	SetEntProp(client, Prop_Send, "m_knockdownReason", 0);
 
 	return Plugin_Handled;
 }

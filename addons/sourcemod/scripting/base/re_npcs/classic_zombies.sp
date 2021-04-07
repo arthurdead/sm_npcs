@@ -27,8 +27,12 @@ int g_nAttackAnim = 34;
 
 void classiczombie_init()
 {
-	CustomEntityFactory factory = register_infected_factory("npc_re_classiczombie");
+	CustomSendtable table = null;
+	CustomEntityFactory factory = register_infected_factory("npc_re_classiczombie", table);
+	table.set_name("DT_ReClassicZombie");
+	table.set_network_name("CReClassicZombie");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
+	datamap.set_name("CReClassicZombie");
 	base_npc_init_datamaps(datamap);
 	datamap.add_prop("m_flRecalcWalkAnim", custom_prop_time);
 	datamap.add_prop("m_nWalkAnim", custom_prop_int);
@@ -48,7 +52,7 @@ public void re_classiczombie_precache(moreinfected_data data)
 	g_nAttackAnim = 34;
 }
 
-public int re_classiczombie_spawn_common(int entity, Address area, float pos[3], infected_directive directive, moreinfected_data data)
+public int re_classiczombie_spawn_common(int entity, Address area, float pos[3], CommonInfectedSpawnDirective directive, moreinfected_data data)
 {
 	RemoveEntity(entity);
 

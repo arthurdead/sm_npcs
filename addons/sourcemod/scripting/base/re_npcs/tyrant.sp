@@ -6,8 +6,12 @@ BehaviorActionEntry tyrant_attack = null;
 
 void tyrant_init()
 {
-	CustomEntityFactory factory = register_infected_factory("npc_re_tyrant");
+	CustomSendtable table = null;
+	CustomEntityFactory factory = register_infected_factory("npc_re_tyrant", table);
+	table.set_name("DT_ReTyrant");
+	table.set_network_name("CReTyrant");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
+	datamap.set_name("CReTyrant");
 	base_npc_init_datamaps(datamap);
 	datamap.add_prop("m_flLastStep", custom_prop_time);
 
@@ -90,6 +94,18 @@ BehaviorResultType TyrantAttackStart(BehaviorAction action, int entity, Behavior
 	return BEHAVIOR_CONTINUE;
 }
 
+bool TyrantEnumStagger(int entity, int attacker)
+{
+	if(entity >= 1 && entity <= MaxClients) {
+		if(L4D2_IsSurvivorBusy(entity)) {
+			return true;
+		}
+
+		L4D_StaggerPlayer(entity, attacker, NULL_VECTOR);
+	}
+	return true;
+}
+
 bool TyrantEnumKockback(int entity, DataPack data)
 {
 	if(entity >= 1 && entity <= MaxClients) {
@@ -98,9 +114,7 @@ bool TyrantEnumKockback(int entity, DataPack data)
 		}
 
 		BehaviorAction action = data.ReadCell();
-
 		int type = data.ReadCell();
-
 		int attacker = data.ReadCell();
 
 		float ang[3];
@@ -108,24 +122,43 @@ bool TyrantEnumKockback(int entity, DataPack data)
 
 		float dir[3];
 		GetAngleVectors(ang, dir, NULL_VECTOR, NULL_VECTOR);
+
 		if(type == 20) {
-			ScaleVector(dir, 400.0);
-			SDKHooks_TakeDamage(entity, attacker, attacker, 5.0, DMG_CRUSH|DMG_CLUB);
+			ScaleVector(dir, 200.0);
 		} else if(type == 21) {
 			ScaleVector(dir, 100.0);
-			SDKHooks_TakeDamage(entity, attacker, attacker, 5.0, DMG_CRUSH|DMG_CLUB);
 		}
+
+		SDKHooks_TakeDamage(entity, attacker, attacker, 5.0, DMG_CRUSH|DMG_CLUB);
 		L4D2_CTerrorPlayer_Fling(entity, entity, dir);
 		SetEntProp(entity, Prop_Send, "m_knockdownReason", 0);
+
 		action.set_data("hit", true);
 	}
 	return true;
 }
 
+void DoTyrantStagger(INextBot bot, int entity)
+{
+	IBody body = bot.BodyInterface;
+
+	float mins[3];
+	body.GetHullMins(mins);
+	float maxs[3];
+	body.GetHullMaxs(maxs);
+
+	float end[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", end);
+
+	if(bot.IsDebugging(NEXTBOT_BEHAVIOR)) {
+		DrawHull(end, _, mins, maxs);
+	}
+
+	TR_EnumerateEntitiesHull(end, end, mins, maxs, PARTITION_SOLID_EDICTS, TyrantEnumStagger, entity);
+}
+
 void DoTyrantAttack(BehaviorAction action, INextBot bot, int entity, float pos[3], float ang[3], int type)
 {
-	EmitSoundToAll(tyrantswing[GetRandomInt(0, sizeof(tyrantswing)-1)], entity);
-
 	IBody body = bot.BodyInterface;
 
 	float mins[3];
@@ -139,10 +172,16 @@ void DoTyrantAttack(BehaviorAction action, INextBot bot, int entity, float pos[3
 	end[2] = pos[2];
 
 	if(type == 20) {
-		VectorAddRotatedOffset(ang, end, view_as<float>({50.0, 0.0, 0.0}));
+		VectorAddRotatedOffset(ang, end, view_as<float>({70.0, 0.0, 0.0}));
 	} else if(type == 21) {
 		VectorAddRotatedOffset(ang, end, view_as<float>({100.0, 0.0, 0.0}));
 	}
+
+	if(bot.IsDebugging(NEXTBOT_BEHAVIOR)) {
+		DrawHull(end, _, mins, maxs);
+	}
+
+	EmitSoundToAll(tyrantswing[GetRandomInt(0, sizeof(tyrantswing)-1)], entity);
 
 	DataPack data = new DataPack();
 	data.WriteCell(action);
@@ -150,37 +189,35 @@ void DoTyrantAttack(BehaviorAction action, INextBot bot, int entity, float pos[3
 	data.WriteCell(entity);
 	data.WriteFloatArray(ang, sizeof(ang));
 	data.Reset();
-	if(type == 20) {
-		TR_EnumerateEntitiesHull(pos, end, mins, maxs, PARTITION_SOLID_EDICTS, TyrantEnumKockback, data);
-	} else if(type == 21) {
-		TR_EnumerateEntitiesHull(pos, end, mins, maxs, PARTITION_SOLID_EDICTS, TyrantEnumKockback, data);
-	}
+	TR_EnumerateEntitiesHull(end, end, mins, maxs, PARTITION_SOLID_EDICTS, TyrantEnumKockback, data);
 	delete data;
 }
 
 BehaviorResultType TyrantAttackUpdate(BehaviorAction action, int entity, float interval, BehaviorResult result)
 {
-	if(GetEntProp(entity, Prop_Data, "m_bSequenceFinished")) {
-		result.set_reason("sequence done");
-		return BEHAVIOR_DONE;
-	}
-
-	INextBot bot = INextBot(entity);
-
 	BaseAnimating anim = BaseAnimating(entity);
 
 	int sequence = action.get_data("sequence");
+	anim.ResetSequenceEx(sequence);
+
+	INextBot bot = INextBot(entity);
 
 	float pos[3];
 	float ang[3];
-	if(anim.GetIntervalMovement(_, pos, ang)) {
+	bool finished = false;
+	if(anim.GetIntervalMovement(finished, pos, ang)) {
 		bot.LocomotionInterface.DriveTo(pos);
 		SetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
 	}
 
+	if(finished) {
+		result.set_reason("sequence done");
+		return BEHAVIOR_DONE;
+	}
+
 	float cycle = GetEntPropFloat(entity, Prop_Send, "m_flCycle");
 
-	if(sequence == 20 && cycle >= 0.11 && cycle <= 0.12) {
+	if(sequence == 20 && cycle >= 0.10 && cycle <= 0.15) {
 		DoTyrantAttack(action, bot, entity, pos, ang, sequence);
 	} else if(sequence == 21 && cycle >= 0.57 && cycle <= 0.65) {
 		DoTyrantAttack(action, bot, entity, pos, ang, sequence);
@@ -194,14 +231,21 @@ BehaviorResultType TyrantAttackUpdate(BehaviorAction action, int entity, float i
 	return BEHAVIOR_CONTINUE;
 }
 
-void TyrantWalking(INextBot bot, int entity, bool chase = false)
+void TyrantWalking(INextBot bot, int entity, int target = -1)
 {
 	ZombieBotLocomotionCustom locomotion = view_as<ZombieBotLocomotionCustom>(bot.LocomotionInterface);
 
 	int sequence = 1;
 	float speed = locomotion.GroundSpeed;
 	if(speed > 0.0) {
-		sequence = chase ? 3 : 3;
+		sequence = 3;
+
+		if(target != -1) {
+			if(bot.GetRangeToEntity(target) >= 500.0) {
+				sequence = 4;
+				DoTyrantStagger(bot, entity);
+			}
+		}
 
 		if(GetEntPropFloat(entity, Prop_Data, "m_flLastStep") <= GetGameTime()) {
 			EmitSoundToAll(tyrantstep[GetRandomInt(0, sizeof(tyrantstep)-1)], entity);
@@ -224,7 +268,9 @@ void TyrantWalking(INextBot bot, int entity, bool chase = false)
 BehaviorResultType TyrantChaseUpdate(BehaviorAction action, int entity, float interval, BehaviorResult result)
 {
 	int target = EntRefToEntIndex(action.get_data("target"));
-	if(target == -1 || !IsPlayerAlive(target)) {
+	if(target == -1 ||
+		!IsPlayerAlive(target) ||
+		L4D2_IsSurvivorBusy(target)) {
 		result.set_reason("target lost");
 		return BEHAVIOR_DONE;
 	}
@@ -253,7 +299,7 @@ BehaviorResultType TyrantChaseUpdate(BehaviorAction action, int entity, float in
 	ChasePath path = action.get_data("path");
 	path.Update(bot, target, baseline_path_cost, cost_flags_mod|cost_flags_onlywalk);
 
-	TyrantWalking(bot, entity, true);
+	TyrantWalking(bot, entity, target);
 
 	return BEHAVIOR_CONTINUE;
 }
@@ -271,7 +317,8 @@ BehaviorResultType TyrantWanderUpdate(BehaviorAction action, int entity, float i
 	IVision vision = bot.VisionInterface;
 
 	int target = vision.GetPrimaryRecognizedThreat();
-	if(target != -1) {
+	if(target != -1 &&
+		!L4D2_IsSurvivorBusy(target)) {
 		result.action = tyrant_chase.create();
 		result.action.set_data("target", EntIndexToEntRef(target));
 		result.set_reason("found target");
