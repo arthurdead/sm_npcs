@@ -3,26 +3,27 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <left4dhooks>
+#include <dhooks>
 
 #include "base/shared.sp"
 
-#include "base/re_npcs/classic_zombies.sp"
-#include "base/re_npcs/tyrant.sp"
+//#include "re_npcs/classic_zombies.sp"
+#include "re_npcs/tyrant.sp"
 
 public void OnPluginStart()
 {
 	base_npc_init();
 
-	classiczombie_init();
+	//classiczombie_init();
 	tyrant_init();
 
 	RegConsoleCmd("testre", cmd);
+}
 
-	CustomSendtable table = null;
-	CustomEntityFactory factory = register_infected_factory("testinfected", table);
-	table.set_name("DT_TestInfected");
-	table.set_network_name("CTestInfected");
-	//table.override_with("NextBotCombatCharacter");
+public void OnMapStart()
+{
+	moreinfected_data data;
+	re_tyrant_precache(data);
 }
 
 Action cmd(int client, int args)
@@ -43,55 +44,61 @@ Action cmd(int client, int args)
 
 		TR_GetEndPosition(end, trace);
 
+		//int ent = TR_GetEntityIndex(trace);
+		//PrintToServer("%i", ent);
+
 		delete trace;
 	}
 
-	moreinfected_data data;
-	re_tyrant_precache(data);
-
-	int entity = entity = CreateEntityByName("testinfected");
-	PrintToServer("%i", entity);
-	DispatchSpawn(entity);
-
-	SetEntityRenderMode(entity, RENDER_TRANSCOLOR);
-	SetEntityRenderFx(entity, RENDERFX_HOLOGRAM);
-	SetEntityRenderColor(entity, 255, 0, 0);
-
-	PrecacheModel("models/re2/re2zombie_officer.mdl");
-	SetEntityModel(entity, "models/re2/re2zombie_officer.mdl");
-
+	int entity = create_base_npc("npc_re_tyrant", 3);
 	TeleportEntity(entity, end);
 
+	ServerCommand("nb_debug_filter");
+	ServerCommand("nb_debug_filter %i", entity);
+	
 	return Plugin_Handled;
+}
+
+public void OnGameFrame()
+{
+	int door = -1;
+	int client = 1;
+
+	if(door == -1 || !IsClientInGame(client)) {
+		return;
+	}
+
+	float center[3];
+	GetDoorCenter(door, center);
+
+	float offset[3];
+	offset = center;
+	GetOffsetToDoor(client, door, offset, 100.0);
+
+	float mins[3];
+	GetEntPropVector(door, Prop_Data, "m_vecMins", mins);
+
+	float maxs[3];
+	GetEntPropVector(door, Prop_Data, "m_vecMaxs", maxs);
+
+	float ang[3];
+	GetEntPropVector(door, Prop_Data, "m_angAbsRotation", ang);
+
+	DrawHull(center, ang);
+	DrawHull(offset, ang);
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	if(StrEqual(classname, "npc_re_classiczombie")) {
-		SDKHook(entity, SDKHook_Think, classiczombie_think);
-		SDKHook(entity, SDKHook_Spawn, classiczombie_spawn);
+		//SDKHook(entity, SDKHook_Spawn, classiczombie_spawn);
 	} else if(StrEqual(classname, "npc_re_tyrant")) {
-		SDKHook(entity, SDKHook_Think, tyrant_think);
 		SDKHook(entity, SDKHook_Spawn, tyrant_spawn);
-	}
-}
-
-public void OnEntityDestroyed(int entity)
-{
-	if(entity == -1) {
-		return;
-	}
-
-	char classname[64];
-	GetEntityClassname(entity, classname, sizeof(classname));
-	if(StrEqual(classname, "npc_re_classiczombie") ||
-		StrEqual(classname, "npc_re_tyrant")) {
-		base_npc_deleted(entity);
 	}
 }
 
 public void OnPluginEnd()
 {
-	classiczombie_removeall();
-	tyrant_removeall();
+	remove_all_entities("npc_re_classiczombie");
+	remove_all_entities("npc_re_tyrant");
 }

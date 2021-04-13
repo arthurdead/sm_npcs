@@ -28,7 +28,7 @@ int g_nAttackAnim = 34;
 void classiczombie_init()
 {
 	CustomSendtable table = null;
-	CustomEntityFactory factory = register_infected_factory("npc_re_classiczombie", table);
+	CustomEntityFactory factory = register_server_infected_factory("npc_re_classiczombie", table);
 	table.set_name("DT_ReClassicZombie");
 	table.set_network_name("CReClassicZombie");
 	CustomDatamap datamap = CustomDatamap.from_factory(factory);
@@ -198,13 +198,4 @@ void classiczombie_spawn(int entity)
 	ZombieBotLocomotionCustom locomotion = view_as<ZombieBotLocomotionCustom>(bot.LocomotionInterface);
 
 	locomotion.MaxJumpHeight = 18.0;
-}
-
-void classiczombie_removeall()
-{
-	int entity = -1;
-	while((entity = FindEntityByClassname(entity, "npc_re_classiczombie")) != -1) {
-		base_npc_deleted(entity);
-		RemoveEntity(entity);
-	}
 }

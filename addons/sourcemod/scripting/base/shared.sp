@@ -22,43 +22,55 @@ stock void base_npc_init()
 #endif
 }
 
-stock void base_npc_init_datamaps(CustomDatamap datamap)
+stock ChasePath base_npc_create_chase(int entity)
 {
-	datamap.add_prop("m_pChasePath", custom_prop_int);
-	datamap.add_prop("m_flRepathTime", custom_prop_time);
-	datamap.add_prop("m_nState", custom_prop_int);
-	datamap.add_prop("m_hTarget", custom_prop_ehandle);
+#if defined GAME_L4D2
+	InfectedChasePath path = new InfectedChasePath(LEAD_SUBJECT);
+#elseif defined GAME_TF2
+	DirectChasePath path = new DirectChasePath(LEAD_SUBJECT);
+#endif
+	path.MinLookAheadDistance = base_npc_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
+	return path;
+}
+
+stock PathFollower base_npc_create_follower(int entity)
+{
+#if defined GAME_L4D2
+	PathFollower path = new PathFollower();
+#elseif defined GAME_TF2
+	CTFPathFollower path = new CTFPathFollower();
+#endif
+	path.MinLookAheadDistance = base_npc_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
+	return path;
+}
+
+stock bool base_npc_climbuptoledge(GameLocomotionCustom locomotion, float goal[3], float fwd[3], int obstacle)
+{
+	return false;
 }
 
 stock void base_npc_spawn(int entity, IIntentionCustom inte = IIntentionCustom_Null)
 {
 	INextBot bot = INextBot(entity);
+
+	INextBotCustom custom = bot.MakeCustom();
+#if defined GAME_L4D2
+	custom.AllowedToClimb = false;
+#endif
+
+	GameLocomotionCustom locomotion = bot.AllocateCustomLocomotion();
+	locomotion.set_function("ClimbUpToLedge", base_npc_climbuptoledge);
+
 	bot.AllocateCustomBody();
-	bot.AllocateCustomLocomotion();
 	bot.AllocateCustomVision();
 
-	ChasePath path = new ChasePath(LEAD_SUBJECT);
-	path.MinLookAheadDistance = base_npc_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
-	SetEntProp(entity, Prop_Data, "m_pChasePath", path);
-}
-
-stock ChasePath get_npc_path(int entity)
-{
-	return view_as<ChasePath>(GetEntProp(entity, Prop_Data, "m_pChasePath"));
-}
-
-stock void base_npc_deleted(int entity)
-{
-	ChasePath path = get_npc_path(entity);
-	if(path != null) {
-		delete path;
-	}
-	SetEntProp(entity, Prop_Data, "m_pChasePath", 0);
+	SDKHook(entity, SDKHook_Think, base_npc_think);
 }
 
 stock int create_base_npc(const char[] classname, int team = 0)
 {
 	int entity = CreateEntityByName(classname);
+	SetEntProp(entity, Prop_Data, "m_iTeamNum", team);
 	DispatchSpawn(entity);
 	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", team);
 	ActivateEntity(entity);
@@ -85,13 +97,20 @@ stock void base_npc_set_hull(int entity, float width, float height)
 	INextBot bot = INextBot(entity);
 	IBodyCustom body = view_as<IBodyCustom>(bot.BodyInterface);
 
-	body.SetHullMins(hullMins);
-	body.SetHullMaxs(hullMaxs);
 	body.HullWidth = HullWidth;
 	body.HullHeight = HullHeight;
 
 	SetEntPropVector(entity, Prop_Send, "m_vecMins", hullMins);
 	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", hullMaxs);
+
+	hullMins[0] = -HullWidth/2.0;
+	hullMins[1] = hullMins[0];
+
+	hullMaxs[0] = HullWidth/2.0;
+	hullMaxs[1] = hullMaxs[0];
+
+	body.SetHullMins(hullMins);
+	body.SetHullMaxs(hullMaxs);
 }
 
 stock bool TraceEntityFilter_DontHitEntity(int entity, int mask, any data)
@@ -231,9 +250,14 @@ stock void base_npc_resolve_collisions(int entity)
 	}
 }
 
-stock void base_npc_think(int entity, INextBot bot)
+stock void base_npc_think(int entity)
 {
+	BaseAnimating anim = BaseAnimating(entity);
+	anim.StudioFrameAdvance();
+
 	base_npc_resolve_collisions(entity);
+
+	INextBot bot = INextBot(entity);
 
 	if(bot.IsDebugging(NEXTBOT_LOCOMOTION)) {
 		float pos[3];
@@ -244,20 +268,17 @@ stock void base_npc_think(int entity, INextBot bot)
 
 		IBody body = bot.BodyInterface;
 
-		float HullWidth = body.HullWidth;
-		float HullHeight = body.HullHeight;
+		float mins[3];
+		body.GetHullMins(mins);
+		float maxs[3];
+		body.GetHullMaxs(maxs);
 
-		float hullMins[3];
-		hullMins[0] = -HullWidth;
-		hullMins[1] = hullMins[0];
-		hullMins[2] = 0.0;
+		DrawHull(pos, ang, mins, maxs, {255, 0, 0, 255});
 
-		float hullMaxs[3];
-		hullMaxs[0] = HullWidth;
-		hullMaxs[1] = hullMaxs[0];
-		hullMaxs[2] = HullHeight;
+		GetEntPropVector(entity, Prop_Data, "m_vecMins", mins);
+		GetEntPropVector(entity, Prop_Data, "m_vecMaxs", maxs);
 
-		DrawHull(pos, ang, hullMins, hullMaxs);
+		DrawHull(pos, ang, mins, maxs, {0, 255, 0, 255});
 	}
 }
 
@@ -401,7 +422,98 @@ stock void FrameRemoveEntity(int entity)
 	RemoveEntity(entity);
 }
 
-void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float offset[3])
+stock void GetDoorCenter(int entity, float center[3])
+{
+	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", center);
+
+	float ang[3];
+	GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
+
+	float maxs[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecMaxs", maxs);
+
+	float offset[3];
+	offset[0] = 0.0;
+	offset[1] = -(maxs[1]/2.0) + 3.0;
+	offset[2] = -maxs[2] + 7.0;
+
+	int master = GetEntPropEnt(entity, Prop_Data, "m_hMaster");
+	if(master != -1) {
+		offset[1] -= maxs[1]/2.0 + 3.0;
+	}
+
+	VectorAddRotatedOffset(ang, center, offset);
+}
+
+stock void OpenDoorAwayFrom(int door, int entity)
+{
+	int master = GetEntPropEnt(door, Prop_Data, "m_hMaster");
+	if(master != -1) {
+		SetVariantString("!activator")
+		AcceptEntityInput(master, "OpenAwayFrom", entity);
+	} else {
+		SetVariantString("!activator")
+		AcceptEntityInput(door, "OpenAwayFrom", entity);
+	}
+}
+
+stock void GetOffsetToDoor(int entity, int door, float pos[3], float range)
+{
+	float mypos[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", mypos);
+
+	NavRelativeDirType dir = DirectionBetweenEntityVector(door, mypos);
+
+	PrintToServer("%i", dir);
+
+	float offset[3];
+	if(dir == FORWARD) {
+		offset[0] = range;
+	} else if(dir == BACKWARD || dir == LEFT) {
+		offset[0] = -range;
+	}
+
+	float ang[3];
+	GetEntPropVector(door, Prop_Data, "m_angAbsRotation", ang);
+
+	VectorAddRotatedOffset(ang, pos, offset);
+}
+
+stock void remove_all_entities(const char[] classname)
+{
+	int entity = -1;
+	while((entity = FindEntityByClassname(entity, classname)) != -1) {
+		RemoveEntity(entity);
+	}
+}
+
+stock bool AutoMovement(int entity, float pos[3], float ang[3], float scale = 1.0, INextBot bot = INextBot_Null)
+{
+	if(bot == INextBot_Null) {
+		bot = INextBot(entity);
+	}
+
+	GameLocomotionCustom locomotion = view_as<GameLocomotionCustom>(bot.LocomotionInterface);
+	locomotion.RunSpeed = 0.0;
+	locomotion.WalkSpeed = 0.0;
+
+	bool finished = false;
+	if(view_as<BaseAnimating>(entity).GetSequenceMovement(finished, pos, ang)) {
+		float origin[3];
+		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", origin);
+		ScaleVector(pos, scale);
+		AddVectors(origin, pos, pos);
+		locomotion.DriveTo(pos);
+		float rot[3];
+		GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", rot);
+		AddVectors(rot, ang, ang);
+		SetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
+	}
+
+	return finished;
+}
+
+stock void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float offset[3])
 {
 	float vecForward[3]; float vecLeft[3]; float vecUp[3];
 	GetAngleVectors(angle, vecForward, vecLeft, vecUp);
@@ -419,7 +531,7 @@ void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float o
 }
 
 #if defined GAME_L4D2
-bool L4D2_IsSurvivorBusy(int client)
+stock bool L4D2_IsSurvivorBusy(int client)
 {
 	return GetEntityFlags(client) & FL_FROZEN || 
 		GetEntProp(client, Prop_Send, "m_iHideHUD") & ~HIDEHUD_BONUS_PROGRESS || 
