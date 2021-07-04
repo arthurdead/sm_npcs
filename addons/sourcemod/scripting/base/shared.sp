@@ -11,7 +11,14 @@
 
 #define HIDEHUD_BONUS_PROGRESS (1 << 11)
 
+#define DAMAGE_YES 2
+
 ConVar base_npc_path_lookahead_range = null;
+
+stock void base_npc_init_datamaps(CustomDatamap datamap)
+{
+	datamap.add_prop("m_pPathFollower", custom_prop_int);
+}
 
 stock void base_npc_init()
 {
@@ -42,6 +49,18 @@ stock PathFollower base_npc_create_follower(int entity)
 #endif
 	path.MinLookAheadDistance = base_npc_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
 	return path;
+}
+
+stock void base_npc_deleted(int entity)
+{
+	ChasePath path = base_npc_getpath(entity);
+	delete path;
+	SetEntProp(entity, Prop_Data, "m_pPathFollower", 0);
+}
+
+stock ChasePath base_npc_getpath(int entity)
+{
+	return view_as<ChasePath>(GetEntProp(entity, Prop_Data, "m_pPathFollower"));
 }
 
 stock bool base_npc_climbuptoledge(GameLocomotionCustom locomotion, float goal[3], float fwd[3], int obstacle)

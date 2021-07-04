@@ -6,6 +6,7 @@
 #include <datamaps>
 #include <animhelpers>
 #include <nextbot>
+#include <tf2_stocks>
 
 #include "base/shared.sp"
 
@@ -78,8 +79,7 @@ public void OnPluginStart()
 	g_SentryShotInfo.m_iShots = 1;
 	g_SentryShotInfo.m_flDamageForceScale = 1.0;
 
-	//RegAdminCmd("sm_sentrybot", sm_sentrybot, ADMFLAG_GENERIC);
-	RegConsoleCmd("sm_sentrybot", sm_sentrybot);
+	RegAdminCmd("sm_sentrybot", sm_sentrybot, ADMFLAG_GENERIC);
 }
 
 Action sm_sentrybot(int client, int args)
@@ -94,8 +94,8 @@ Action sm_sentrybot(int client, int args)
 	if(bWantsSentryBot[client]) {
 		ReplyToCommand(client, "[SM] sentrybot enabled.");
 
-		int builder = GetBuilderOfType(client, view_as<int>(TFObject_Sentry));
-		if(builder) {
+		int builder = GetBuilderForObjectType(client, view_as<int>(TFObject_Sentry));
+		if(builder != -1) {
 			BuilderSetAsBuildable(builder, view_as<int>(TFObject_Sentry), false);
 			BuilderSetAsBuildable(builder, g_SentryBoyInfo.Index, true);
 		}
@@ -109,8 +109,8 @@ Action sm_sentrybot(int client, int args)
 	} else {
 		ReplyToCommand(client, "[SM] sentrybot disabled.");
 
-		int builder = GetBuilderOfType(client, g_SentryBoyInfo.Index);
-		if(builder) {
+		int builder = GetBuilderForObjectType(client, g_SentryBoyInfo.Index);
+		if(builder != -1) {
 			BuilderSetAsBuildable(builder, g_SentryBoyInfo.Index, false);
 			BuilderSetAsBuildable(builder, view_as<int>(TFObject_Sentry), true);
 		}
@@ -191,7 +191,8 @@ public void OnMapStart()
 
 	g_nMuzzle = anim.LookupAttachment("muzzle");
 
-	g_SentryBoyInfo.SetFloat("m_flBuildTime", anim.SequenceDuration("unfold") * 1.8);
+	int seq = anim.LookupSequence("unfold");
+	g_SentryBoyInfo.SetFloat("m_flBuildTime", anim.SequenceDuration(seq) * 1.8);
 
 	RemoveEntity(entity);
 
@@ -224,7 +225,7 @@ void SentryBotSpawn(int entity)
 	base_npc_set_hull(entity, 20.0, 40.0);
 
 	INextBot bot = INextBot(entity);
-	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
+	NextBotGroundLocomotionCustom locomotion = view_as<NextBotGroundLocomotionCustom>(bot.LocomotionInterface);
 
 	locomotion.DeathDropHeight = 18.0;
 	locomotion.MaxJumpHeight = 18.0;
@@ -352,14 +353,14 @@ void SentryBotThink(int entity, const char[] context, any data)
 	anim.StudioFrameAdvance();
 
 	if(GetEntProp(entity, Prop_Send, "m_bBuilding")) {
-		int sequence = anim.SelectWeightedSequenceEx(ACT_STAND);
-		anim.ResetSequenceEx(sequence);
+		int sequence = anim.SelectWeightedSequence(ACT_STAND);
+		anim.ResetSequence(sequence);
 		return;
 	}
 
 	if(GetEntProp(entity, Prop_Send, "m_bPlacing")) {
-		int sequence = anim.SelectWeightedSequenceEx(ACT_CROUCHIDLE);
-		anim.ResetSequenceEx(sequence);
+		int sequence = anim.SelectWeightedSequence(ACT_CROUCHIDLE);
+		anim.ResetSequence(sequence);
 		return;
 	}
 
@@ -392,8 +393,8 @@ void SentryBotThink(int entity, const char[] context, any data)
 
 	int target = builder;
 
-	ChasePath path = get_npc_path(entity);
-	NextBotGoundLocomotionCustom locomotion = view_as<NextBotGoundLocomotionCustom>(bot.LocomotionInterface);
+	ChasePath path = base_npc_getpath(entity);
+	NextBotGroundLocomotionCustom locomotion = view_as<NextBotGroundLocomotionCustom>(bot.LocomotionInterface);
 
 	bool facingtarget = false;
 	CKnownEntity threat = CKnownEntity_Null;
@@ -439,12 +440,12 @@ void SentryBotThink(int entity, const char[] context, any data)
 
 				locomotion.FaceTowards(target_pos);
 
-				if(!anim.IsPlayingGestureEx(ACT_RANGE_ATTACK1)) {
-					anim.AddGestureEx1(ACT_RANGE_ATTACK1);
+				if(!anim.IsPlayingGesture(ACT_RANGE_ATTACK1)) {
+					anim.AddGesture1(ACT_RANGE_ATTACK1);
 				}
 
 				if(GetEntPropFloat(entity, Prop_Send, "m_flNextAttack") <= GetGameTime()) {
-					anim.GetAttachmentEx(g_nMuzzle, g_SentryShotInfo.m_vecSrc, NULL_VECTOR);
+					anim.GetAttachment(g_nMuzzle, g_SentryShotInfo.m_vecSrc, NULL_VECTOR);
 
 					float target_center[3];
 					vision.IsLineOfSightClearToEntity(target, target_center);
@@ -496,12 +497,12 @@ void SentryBotThink(int entity, const char[] context, any data)
 			IVision vision = bot.VisionInterface;
 
 			if(attacking && vision.IsInFieldOfViewVector(target_pos)) {
-				if(!anim.IsPlayingGestureEx(ACT_RANGE_ATTACK1)) {
-					anim.AddGestureEx1(ACT_RANGE_ATTACK1);
+				if(!anim.IsPlayingGesture(ACT_RANGE_ATTACK1)) {
+					anim.AddGesture1(ACT_RANGE_ATTACK1);
 				}
 
 				if(GetEntPropFloat(entity, Prop_Send, "m_flNextAttack") <= GetGameTime()) {
-					anim.GetAttachmentEx(g_nMuzzle, g_SentryShotInfo.m_vecSrc, NULL_VECTOR);
+					anim.GetAttachment(g_nMuzzle, g_SentryShotInfo.m_vecSrc, NULL_VECTOR);
 
 					SubtractVectors(target_pos, g_SentryShotInfo.m_vecSrc, g_SentryShotInfo.m_vecDirShooting);
 
@@ -521,7 +522,7 @@ void SentryBotThink(int entity, const char[] context, any data)
 		}
 	}
 
-	int sequence = anim.SelectWeightedSequenceEx(ACT_IDLE);
+	int sequence = anim.SelectWeightedSequence(ACT_IDLE);
 
 	float speed = locomotion.GroundSpeed;
 	if(speed > 1.0) {
@@ -531,9 +532,9 @@ void SentryBotThink(int entity, const char[] context, any data)
 		}
 
 		if(threat == CKnownEntity_Null && !m_bPlayerControlled) {
-			sequence = anim.SelectWeightedSequenceEx(ACT_WALK);
+			sequence = anim.SelectWeightedSequence(ACT_WALK);
 		} else {
-			sequence = anim.SelectWeightedSequenceEx(ACT_WALK_AIM);
+			sequence = anim.SelectWeightedSequence(ACT_WALK_AIM);
 		}
 	} else if(threat == CKnownEntity_Null) {
 		if(facingtarget && !GetEntProp(entity, Prop_Data, "m_bWalkingTo")) {
@@ -560,7 +561,7 @@ void SentryBotThink(int entity, const char[] context, any data)
 		}
 	}
 
-	anim.ResetSequenceEx(sequence);
+	anim.ResetSequence(sequence);
 
 	float m_flGroundSpeed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
 	if(m_flGroundSpeed == 0.0) {
