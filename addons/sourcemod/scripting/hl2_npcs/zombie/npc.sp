@@ -6,13 +6,19 @@ static int AE_ZOMBIE_ATTACK_RIGHT = -1;
 static int AE_ZOMBIE_ATTACK_LEFT = -1;
 static int AE_ZOMBIE_ATTACK_BOTH = -1;
 
+static int AE_ZOMBIE_STEP_LEFT = -1;
+static int AE_ZOMBIE_STEP_RIGHT = -1;
+static int AE_ZOMBIE_SCUFF_LEFT = -1;
+static int AE_ZOMBIE_SCUFF_RIGHT = -1;
+
 static int npc_move_yaw = -1;
 
 static int npc_health = 300;
 
 void hl2_zombie_init()
 {
-	register_robot_nextbot_factory("npc_hl2_zombie", "HL2Zombie");
+	CustomDatamap datamap = register_robot_nextbot_factory("npc_hl2_zombie", "HL2Zombie");
+	datamap.add_prop("m_flNextMoanSound", custom_prop_time);
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Zombie");
 	spawner.Parse = base_npc_pop_parse;
@@ -20,6 +26,13 @@ void hl2_zombie_init()
 	spawner.GetClass = npc_pop_class;
 	spawner.HasAttribute = base_npc_pop_attrs;
 	spawner.GetHealth = npc_pop_health;
+	spawner.GetClassIcon = npc_pop_classicon;
+}
+
+static bool npc_pop_classicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	strcopy(str, len, "hl2_zombie");
+	return true;
 }
 
 static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
@@ -48,7 +61,33 @@ void hl2_zombie_precache(int entity)
 	AE_ZOMBIE_ATTACK_LEFT = EventList_RegisterPrivateEvent("AE_ZOMBIE_ATTACK_LEFT");
 	AE_ZOMBIE_ATTACK_BOTH = EventList_RegisterPrivateEvent("AE_ZOMBIE_ATTACK_BOTH");
 
+	AE_ZOMBIE_STEP_LEFT = EventList_RegisterPrivateEvent("AE_ZOMBIE_STEP_LEFT");
+	AE_ZOMBIE_STEP_RIGHT = EventList_RegisterPrivateEvent("AE_ZOMBIE_STEP_RIGHT");
+	AE_ZOMBIE_SCUFF_LEFT = EventList_RegisterPrivateEvent("AE_ZOMBIE_SCUFF_LEFT");
+	AE_ZOMBIE_SCUFF_RIGHT = EventList_RegisterPrivateEvent("AE_ZOMBIE_SCUFF_RIGHT");
+
 	npc_move_yaw = AnimatingLookupPoseParameter(entity, "move_yaw");
+
+	LoadSoundScript("scripts/npc_sounds_zombie.txt");
+
+	PrecacheScriptSound("Zombie.Idle");
+	PrecacheScriptSound("Zombie.Die");
+
+	PrecacheScriptSound("Zombie.Attack");
+	PrecacheScriptSound("Zombie.AttackHit");
+	PrecacheScriptSound("Zombie.AttackMiss");
+
+	PrecacheScriptSound("NPC_BaseZombie.Moan1");
+	PrecacheScriptSound("NPC_BaseZombie.Moan2");
+	PrecacheScriptSound("NPC_BaseZombie.Moan3");
+	PrecacheScriptSound("NPC_BaseZombie.Moan4");
+
+	PrecacheScriptSound("Zombie.FootstepRight");
+	PrecacheScriptSound("Zombie.FootstepLeft");
+	PrecacheScriptSound("Zombie.ScuffRight");
+	PrecacheScriptSound("Zombie.ScuffLeft");
+
+	PrecacheScriptSound("Zombie.Pain");
 }
 
 void hl2_zombie_created(int entity)
@@ -73,10 +112,23 @@ static void npc_think(int entity)
 
 static Action npc_handle_animevent(int entity, animevent_t event)
 {
-	if(event.event == AE_ZOMBIE_ATTACK_RIGHT ||
+	if(event.event == AE_ZOMBIE_STEP_LEFT) {
+		EmitGameSoundToAll("Zombie.FootstepLeft", entity);
+	} else if(event.event == AE_ZOMBIE_STEP_RIGHT) {
+		EmitGameSoundToAll("Zombie.FootstepRight", entity);
+	} else if(event.event == AE_ZOMBIE_SCUFF_LEFT) {
+		EmitGameSoundToAll("Zombie.ScuffLeft", entity);
+	} else if(event.event == AE_ZOMBIE_SCUFF_RIGHT) {
+		EmitGameSoundToAll("Zombie.ScuffRight", entity);
+	} else if(event.event == AE_ZOMBIE_ATTACK_RIGHT ||
 		event.event == AE_ZOMBIE_ATTACK_LEFT ||
 		event.event == AE_ZOMBIE_ATTACK_BOTH) {
-		CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+		if(hit != -1) {
+			EmitGameSoundToAll("Zombie.AttackHit", entity);
+		} else {
+			EmitGameSoundToAll("Zombie.AttackMiss", entity);
+		}
 	}
 
 	return Plugin_Continue;
@@ -89,6 +141,12 @@ static Activity npc_translate_act(IBodyCustom body, Activity act)
 	}
 
 	return act;
+}
+
+static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
+{
+	EmitGameSoundToAll("Zombie.Pain", entity);
+	return Plugin_Continue;
 }
 
 static void npc_spawn(int entity)
@@ -109,4 +167,6 @@ static void npc_spawn(int entity)
 
 	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
 	body_custom.set_function("TranslateActivity", npc_translate_act);
+
+	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 }

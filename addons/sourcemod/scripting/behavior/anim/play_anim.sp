@@ -10,9 +10,18 @@ void play_anim_action_init()
 
 static BehaviorResultType play_anim_complete(BehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
 {
-	BehaviorActionEntry next = action.get_data("next_action_entry");
+	BehaviorActionEntry next_entry = action.get_data("next_action_entry");
+	BehaviorAction next_action = next_entry.create();
+
+	if(action.has_function("setup_next_action")) {
+		Function func = action.get_function("setup_next_action");
+		Call_StartFunction(null, func);
+		Call_PushCell(next_action);
+		Call_Finish();
+	}
+
+	result.action = next_action;
 	result.set_reason("anim complete");
-	result.action = next.create();
 	result.priority = RESULT_TRY;
 	return BEHAVIOR_CHANGE_TO;
 }
@@ -23,7 +32,7 @@ static BehaviorResultType play_anim_interrupted(BehaviorAction action, INextBot 
 	return BEHAVIOR_CONTINUE;
 }
 
-static BehaviorResultType play_anim_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
+BehaviorResultType play_anim_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
 {
 	IBody body = bot.BodyInterface;
 

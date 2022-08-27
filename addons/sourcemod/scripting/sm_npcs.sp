@@ -14,8 +14,12 @@
 #include <bit>
 #include <modifier_spawner>
 #include <expression_parser>
+#include <wpnhack>
+#include <loadsoundscript>
 
 TFMonsterResource monster_resource;
+
+ConVar npc_deathnotice_eventtime;
 
 #include "sm_npcs_shared.sp"
 
@@ -50,6 +54,8 @@ public void OnPluginStart()
 	nav_authorative = FindConVar("nav_authorative");
 	path_expensive_optimize = FindConVar("path_expensive_optimize");
 
+	npc_deathnotice_eventtime = FindConVar("npc_deathnotice_eventtime");
+
 	if(late_load) {
 		int entity = -1;
 		char classname[64];
@@ -67,7 +73,7 @@ public void OnConfigsExecuted()
 
 	FindConVar("ai_show_hull_attacks").BoolValue = true;
 
-	InsertServerCommand("nb_debug BEHAVIOR");
+	//InsertServerCommand("nb_debug BEHAVIOR");
 	ServerExecute();
 }
 

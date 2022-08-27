@@ -16,6 +16,13 @@ void hl2_helicopter_init()
 	spawner.GetClass = npc_pop_class;
 	spawner.HasAttribute = base_npc_pop_attrs;
 	spawner.GetHealth = npc_pop_health;
+	spawner.GetClassIcon = npc_pop_classicon;
+}
+
+static bool npc_pop_classicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	strcopy(str, len, "hl2_helicopter");
+	return true;
 }
 
 static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
@@ -59,7 +66,7 @@ static void npc_think(int entity)
 
 	npc_resolve_collisions(entity);
 
-	handle_playbackrate(entity, locomotion, body);
+	SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
 }
 
 static int npc_select_animation(IBodyCustom body, int entity, Activity act)
@@ -76,6 +83,9 @@ static void npc_spawn(int entity)
 
 	INextBot bot = INextBot(entity);
 	flying_npc_spawn(bot, entity, npc_health, view_as<float>({38.0, 38.0, 38.0}), 100.0, 500.0);
+
+	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
+	custom_locomotion.DesiredAltitude = 100.0;
 
 	bot.AllocateCustomIntention(hl2_helicopter_behavior, "HL2HelicopterBehavior");
 

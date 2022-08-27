@@ -19,6 +19,13 @@ void kf2_clot_init()
 	spawner.GetClass = npc_pop_class;
 	spawner.HasAttribute = base_npc_pop_attrs;
 	spawner.GetHealth = npc_pop_health;
+	spawner.GetClassIcon = npc_pop_classicon;
+}
+
+static bool npc_pop_classicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	strcopy(str, len, "kf2_clot");
+	return true;
 }
 
 static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)

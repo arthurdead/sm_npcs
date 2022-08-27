@@ -3,14 +3,14 @@ BehaviorActionEntry basic_melee_action;
 void basic_melee_action_init()
 {
 	basic_melee_action = new BehaviorActionEntry("BasicMelee");
-	basic_melee_action.set_function("OnStart", basic_melee_start);
-	basic_melee_action.set_function("Update", basic_melee_update);
+	basic_melee_action.set_function("OnStart", action_start);
+	basic_melee_action.set_function("Update", action_update);
 	basic_melee_action.set_function("OnEnd", shared_end_chase);
 	basic_melee_action.set_function("OnStuck", shared_stuck_chase);
 	basic_melee_action.set_function("OnKilled", shared_killed);
 }
 
-static BehaviorResultType basic_melee_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
+static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
 {
 	action.set_data("victim", INVALID_ENT_REFERENCE);
 	action.set_data("victim_time", 0.0);
@@ -18,10 +18,12 @@ static BehaviorResultType basic_melee_start(BehaviorAction action, INextBot bot,
 	action.set_data("attack_time", 0.0);
 	action.set_data("swing_time", 0.0);
 
+	action.set_data("move_while_swing", 0);
+
 	return shared_start_chase(action, bot, entity, prior, result);
 }
 
-static BehaviorResultType basic_melee_update(BehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
+static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
 {
 	int victim = EntRefToEntIndex(action.get_data("victim"));
 	float victim_time = action.get_data("victim_time");
@@ -49,7 +51,18 @@ static BehaviorResultType basic_melee_update(BehaviorAction action, INextBot bot
 		arousal = ALERT;
 
 		if(bot.IsRangeGreaterThanEntity(victim, chase_range) || !sight_clear) {
-			shared_update_chase(action, entity, bot, locomotion, body, victim);
+			bool should_move = true;
+
+			if(action.has_data("move_while_swing") && action.get_data("move_while_swing") == 0) {
+				float swing_time = action.get_data("swing_time");
+				if(swing_time > GetGameTime()) {
+					should_move = false;
+				}
+			}
+
+			if(should_move) {
+				shared_update_chase(action, entity, bot, locomotion, body, victim);
+			}
 		}
 
 		if(bot.IsRangeLessThanEntity(victim, attack_range)) {
@@ -81,6 +94,8 @@ static BehaviorResultType basic_melee_update(BehaviorAction action, INextBot bot
 				if(sight_clear) {
 					float attack_time = action.get_data("attack_time");
 					if(attack_time < GetGameTime()) {
+						SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
+
 						float swing_time = action.get_data("swing_time");
 						if(swing_time < GetGameTime()) {
 							if(body.StartActivity(ACT_MELEE_ATTACK1, NO_ACTIVITY_FLAGS)) {
@@ -90,6 +105,13 @@ static BehaviorResultType basic_melee_update(BehaviorAction action, INextBot bot
 									swing_time = (GetGameTime() + duration);
 									action.set_data("swing_time", swing_time);
 									action.set_data("attack_time", swing_time);
+
+									if(action.has_function("handle_swing")) {
+										Function func = action.get_function("handle_swing");
+										Call_StartFunction(null, func);
+										Call_PushCell(entity);
+										Call_Finish();
+									}
 								}
 							}
 						}
@@ -110,6 +132,13 @@ static BehaviorResultType basic_melee_update(BehaviorAction action, INextBot bot
 	float swing_time = action.get_data("swing_time");
 	if(swing_time < GetGameTime()) {
 		shared_handle_anim(locomotion, body);
+
+		if(action.has_function("handle_idle")) {
+			Function func = action.get_function("handle_idle");
+			Call_StartFunction(null, func);
+			Call_PushCell(entity);
+			Call_Finish();
+		}
 	}
 
 	return BEHAVIOR_CONTINUE;

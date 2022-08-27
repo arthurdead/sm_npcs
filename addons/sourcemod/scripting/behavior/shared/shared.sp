@@ -15,7 +15,7 @@ void shared_handle_anim(ILocomotion locomotion, IBody body)
 	}
 }
 
-bool shared_is_victim_chaseable(INextBot bot, int entity, int victim)
+bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check_ground = true)
 {
 	if(victim == 0 ||
 		victim == -1 ||
@@ -58,25 +58,27 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim)
 		return false;
 	}
 
-	int ground = GetEntPropEnt(victim, Prop_Data, "m_hGroundEntity");
-	if(ground != -1) {
-		CNavArea last_area = GetEntityLastKnownArea(victim);
-		if(last_area != CNavArea_Null) {
-			float victim_pos[3];
-			GetEntPropVector(victim, Prop_Data, "m_vecAbsOrigin", victim_pos);
+	if(check_ground) {
+		int ground = GetEntPropEnt(victim, Prop_Data, "m_hGroundEntity");
+		if(ground != -1) {
+			CNavArea last_area = GetEntityLastKnownArea(victim);
+			if(last_area != CNavArea_Null) {
+				float victim_pos[3];
+				GetEntPropVector(victim, Prop_Data, "m_vecAbsOrigin", victim_pos);
 
-			float victim_nav_pos[3];
-			last_area.GetClosestPointOnArea(victim_pos, victim_nav_pos);
+				float victim_nav_pos[3];
+				last_area.GetClosestPointOnArea(victim_pos, victim_nav_pos);
 
-			float victim_pos_delta[3];
-			SubtractVectors(victim_pos, victim_nav_pos, victim_pos_delta);
+				float victim_pos_delta[3];
+				SubtractVectors(victim_pos, victim_nav_pos, victim_pos_delta);
 
-			float length = GetVectorLength2D(victim_pos_delta);
-			if(length >= 50.0) {
+				float length = GetVectorLength2D(victim_pos_delta);
+				if(length >= 50.0) {
+					return false;
+				}
+			} else {
 				return false;
 			}
-		} else {
-			return false;
 		}
 	}
 
@@ -178,7 +180,18 @@ BehaviorResultType shared_killed(BehaviorAction action, INextBot bot, int entity
 	CombatCharacterEventKilled(entity, info);
 
 	if(AnimatingSelectWeightedSequence(entity, ACT_DIERAGDOLL) == -1) {
+		int flags = GetEntProp(entity, Prop_Send, "m_fEffects");
+		flags |= EF_NODRAW;
+		SetEntProp(entity, Prop_Send, "m_fEffects", flags);
+
 		RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
+	}
+
+	if(action.has_function("handle_die")) {
+		Function func = action.get_function("handle_die");
+		Call_StartFunction(null, func);
+		Call_PushCell(entity);
+		Call_Finish();
 	}
 
 	result.set_reason("npc killed");

@@ -1,5 +1,13 @@
 Activity ACT_ANTLION_BURROW_OUT = ACT_INVALID;
 
+static int AE_ANTLION_BURROW_OUT = -1;
+static int AE_ANTLION_MELEE1_SOUND = -1;
+static int AE_ANTLION_MELEE2_SOUND = -1;
+
+static int AE_ANTLION_FOOTSTEP_SOFT = -1;
+static int AE_ANTLION_FOOTSTEP_HEAVY = -1;
+static int AE_ANTLION_WALK_FOOTSTEP = -1;
+
 static int AE_ANTLION_MELEE_HIT1 = -1;
 static int AE_ANTLION_MELEE_HIT2 = -1;
 static int AE_ANTLION_MELEE_POUNCE = -1;
@@ -12,7 +20,8 @@ static int npc_health = 300;
 
 void hl2_antlion_init()
 {
-	register_robot_nextbot_factory("npc_hl2_antlion", "HL2Antlion");
+	CustomDatamap datamap = register_robot_nextbot_factory("npc_hl2_antlion", "HL2Antlion");
+	datamap.add_prop("m_flIdleDelay", custom_prop_time);
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Antlion");
 	spawner.Parse = base_npc_pop_parse;
@@ -20,6 +29,13 @@ void hl2_antlion_init()
 	spawner.GetClass = npc_pop_class;
 	spawner.HasAttribute = base_npc_pop_attrs;
 	spawner.GetHealth = npc_pop_health;
+	spawner.GetClassIcon = npc_pop_classicon;
+}
+
+static bool npc_pop_classicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
+{
+	strcopy(str, len, "hl2_antlion");
+	return true;
 }
 
 static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
@@ -44,11 +60,35 @@ void hl2_antlion_precache(int entity)
 
 	ACT_ANTLION_BURROW_OUT = ActivityList_RegisterPrivateActivity("ACT_ANTLION_BURROW_OUT");
 
+	AE_ANTLION_BURROW_OUT = EventList_RegisterPrivateEvent("AE_ANTLION_BURROW_OUT");
+	AE_ANTLION_MELEE1_SOUND = EventList_RegisterPrivateEvent("AE_ANTLION_MELEE1_SOUND");
+	AE_ANTLION_MELEE2_SOUND = EventList_RegisterPrivateEvent("AE_ANTLION_MELEE2_SOUND");
+
+	AE_ANTLION_FOOTSTEP_SOFT = EventList_RegisterPrivateEvent("AE_ANTLION_FOOTSTEP_SOFT");
+	AE_ANTLION_FOOTSTEP_HEAVY = EventList_RegisterPrivateEvent("AE_ANTLION_FOOTSTEP_HEAVY");
+	AE_ANTLION_WALK_FOOTSTEP = EventList_RegisterPrivateEvent("AE_ANTLION_WALK_FOOTSTEP");
+
 	AE_ANTLION_MELEE_HIT1 = EventList_RegisterPrivateEvent("AE_ANTLION_MELEE_HIT1");
 	AE_ANTLION_MELEE_HIT2 = EventList_RegisterPrivateEvent("AE_ANTLION_MELEE_HIT2");
 	AE_ANTLION_MELEE_POUNCE = EventList_RegisterPrivateEvent("AE_ANTLION_MELEE_POUNCE");
 
 	npc_move_yaw = AnimatingLookupPoseParameter(entity, "move_yaw");
+
+	LoadSoundScript("scripts/npc_sounds_antlion.txt");
+
+	PrecacheScriptSound("NPC_Antlion.BurrowOut");
+
+	PrecacheScriptSound("NPC_Antlion.MeleeAttack");
+	PrecacheScriptSound("NPC_Antlion.MeleeAttackSingle");
+	PrecacheScriptSound("NPC_Antlion.MeleeAttackDouble");
+
+	PrecacheScriptSound("NPC_Antlion.Idle");
+
+	PrecacheScriptSound("NPC_Antlion.FootstepSoft");
+	PrecacheScriptSound("NPC_Antlion.FootstepHeavy");
+	PrecacheScriptSound("NPC_Antlion.Footstep");
+
+	PrecacheScriptSound("NPC_Antlion.Pain");
 }
 
 void hl2_antlion_created(int entity)
@@ -73,12 +113,33 @@ static void npc_think(int entity)
 
 static Action npc_handle_animevent(int entity, animevent_t event)
 {
-	if(event.event == AE_ANTLION_MELEE_HIT1 ||
+	if(event.event == AE_ANTLION_BURROW_OUT) {
+		EmitGameSoundToAll("NPC_Antlion.BurrowOut", entity);
+	} else if(event.event == AE_ANTLION_MELEE1_SOUND) {
+		EmitGameSoundToAll("NPC_Antlion.MeleeAttackSingle", entity);
+	} else if(event.event == AE_ANTLION_MELEE2_SOUND) {
+		EmitGameSoundToAll("NPC_Antlion.MeleeAttackDouble", entity);
+	} else if(event.event == AE_ANTLION_FOOTSTEP_SOFT) {
+		EmitGameSoundToAll("NPC_Antlion.FootstepSoft", entity);
+	} else if(event.event == AE_ANTLION_FOOTSTEP_HEAVY) {
+		EmitGameSoundToAll("NPC_Antlion.FootstepHeavy", entity);
+	} else if(event.event == AE_ANTLION_WALK_FOOTSTEP) {
+		EmitGameSoundToAll("NPC_Antlion.Footstep", entity);
+	} else if(event.event == AE_ANTLION_MELEE_HIT1 ||
 		event.event == AE_ANTLION_MELEE_HIT2 ||
 		event.event == AE_ANTLION_MELEE_POUNCE) {
-		CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+		if(hit != -1) {
+			EmitGameSoundToAll("NPC_Antlion.MeleeAttack", entity);
+		}
 	}
 
+	return Plugin_Continue;
+}
+
+static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
+{
+	EmitGameSoundToAll("NPC_Antlion.Pain", entity);
 	return Plugin_Continue;
 }
 
@@ -95,4 +156,6 @@ static void npc_spawn(int entity)
 	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 195.0, 354.90);
 
 	bot.AllocateCustomIntention(hl2_antlion_behavior, "HL2AntlionBehavior");
+
+	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 }

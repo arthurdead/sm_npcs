@@ -9,9 +9,13 @@
 
 #define EFL_KILLME (1 << 0)
 
+#define EF_NODRAW 0x020
+
 #define MELEE_RANGE 55.0
 float MELEE_MINS[3] = {-24.0, -24.0, -82.0};
 float MELEE_MAXS[3] = {24.0, 24.0, 82.0};
+
+#define RANGED_RANGE 1000.0
 
 stock float GetVectorLength2D(const float vec[3])
 {
@@ -297,6 +301,17 @@ stock void frame_remove_npc(int entity)
 	}
 
 	RemoveEntity(entity);
+}
+
+stock Action timer_remove_npc(Handle timer, int entity)
+{
+	entity = EntRefToEntIndex(entity);
+	if(entity == -1) {
+		return Plugin_Continue;
+	}
+
+	RemoveEntity(entity);
+	return Plugin_Continue;
 }
 
 void set_npc_hull(IBodyCustom body_custom, int entity, const float hull[3])
