@@ -1,3 +1,5 @@
+int hl2_helicopter_muzzle = -1;
+
 #include "behavior.sp"
 
 static int npc_idle_anim = -1;
@@ -54,6 +56,8 @@ void hl2_helicopter_precache(int entity)
 
 	npc_rudder = AnimatingLookupPoseParameter(entity, "rudder");
 
+	hl2_helicopter_muzzle = AnimatingLookupAttachment(entity, "Muzzle");
+
 	LoadSoundScript("scripts/npc_sounds_attackheli.txt");
 
 	PrecacheScriptSound("NPC_AttackHelicopter.Rotors");
@@ -107,4 +111,10 @@ static void npc_spawn(int entity)
 
 	EmitGameSoundToAll("NPC_AttackHelicopter.Rotors", entity);
 	EmitGameSoundToAll("NPC_AttackHelicopter.RotorBlast", entity);
+}
+
+void hl2_helicopter_destroyed(int entity)
+{
+	StopGameSound(entity, "NPC_AttackHelicopter.Rotors");
+	StopGameSound(entity, "NPC_AttackHelicopter.RotorBlast");
 }

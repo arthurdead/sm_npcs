@@ -32,9 +32,11 @@ void hl2_npcs_entity_created(int entity, const char[] classname)
 	}
 }
 
-stock void hl2_npcs_entity_destroyed(int entity, const char[] classname)
+void hl2_npcs_entity_destroyed(int entity, const char[] classname)
 {
-	
+	if(StrContains(classname, "npc_hl2_helicopter") != -1) {
+		hl2_helicopter_destroyed(entity);
+	}
 }
 
 void hl2_npcs_plugin_end()

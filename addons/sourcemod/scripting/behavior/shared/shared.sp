@@ -46,6 +46,16 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 		return false;
 	}
 
+	char classname[64];
+	GetEntityClassname(victim, classname, sizeof(classname));
+
+	if(StrContains(classname, "obj_") != -1) {
+		int builder = GetEntPropEnt(victim, Prop_Send, "m_hBuilder");
+		if(builder == -1) {
+			return false;
+		}
+	}
+
 	if(GetEntProp(victim, Prop_Data, "m_takedamage") == DAMAGE_NO ||
 		GetEntProp(victim, Prop_Data, "m_lifeState") != LIFE_ALIVE ||
 		GetEntProp(entity, Prop_Data, "m_iEFlags") & EFL_KILLME) {
