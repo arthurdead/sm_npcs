@@ -242,30 +242,6 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
 }
 
-stock bool base_npc_pop_attrs(CustomPopulationSpawner spawner, AttributeType attr, int num)
-{
-	return !!(attr & NPC_POP_FLAGS);
-}
-
-static bool npc_health_expr_varcb(any user_data, const char[] name, float &value)
-{
-	return false;
-}
-
-static bool npc_health_expr_funccb(any user_data, const char[] name, int num_args, const float[] args, float &value)
-{
-	return false;
-}
-
-stock int base_npc_pop_health(CustomPopulationSpawner spawner, int num, int health)
-{
-	if(spawner.has_data("health")) {
-		health = spawner.get_data("health");
-	}
-
-	return health;
-}
-
 enum npc_healthbar_t
 {
 	npc_healthbar_none,
@@ -274,34 +250,45 @@ enum npc_healthbar_t
 	npc_healthbar_boss
 };
 
+stock bool base_npc_pop_attrs(CustomPopulationSpawner spawner, AttributeType attr, int num)
+{
+	if(expr_pop_attribute(spawner, attr, num)) {
+		return true;
+	}
+
+	AttributeType flags = NPC_POP_FLAGS;
+
+	npc_healthbar_t healthbar = npc_healthbar_none;
+	if(spawner.has_data("healthbar")) {
+		healthbar = spawner.get_data("healthbar");
+	}
+
+	if(healthbar == npc_healthbar_tank) {
+		flags |= MINIBOSS;
+	} else if(healthbar == npc_healthbar_boss) {
+		flags |= (MINIBOSS|USE_BOSS_HEALTH_BAR);
+	}
+
+	return !!(flags & attr);
+}
+
+stock int base_npc_pop_health(CustomPopulationSpawner spawner, int num, int health)
+{
+	int health_override = expr_pop_health(spawner, num);
+	if(health_override > 0) {
+		return health_override;
+	}
+
+	return health;
+}
+
 stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 {
-	//TODO!!!! move both of these to expr_pop.sp
-	char health_expr[EXPR_STR_MAX];
-	data.GetString("HealthExpr", health_expr, EXPR_STR_MAX);
-	if(health_expr[0] != '\0') {
-		float health_fl = parse_expression(health_expr, npc_health_expr_varcb, npc_health_expr_funccb);
-		if(health_fl < 0.1) {
-			return false;
-		}
-
-		int health = RoundToFloor(health_fl);
-		if(health < 1) {
-			return false;
-		}
-
-		spawner.set_data("health", health);
-	}
-	float model_scale = data.GetFloat("ModelScale", -1.0);
-	if(model_scale != -1.0) {
-		if(model_scale < 0.1) {
-			return false;
-		}
-
-		spawner.set_data("model_scale", model_scale);
+	if(!expr_pop_parse(spawner, data)) {
+		return false;
 	}
 
-	char healthbar_str[10];
+	char healthbar_str[7];
 	data.GetString("Healthbar", healthbar_str, sizeof(healthbar_str));
 	if(StrEqual(healthbar_str, "None")) {
 		spawner.set_data("healthbar", npc_healthbar_none);
@@ -329,7 +316,11 @@ stock bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner 
 	char tmp_classname[64];
 	strcopy(tmp_classname, sizeof(tmp_classname), classname);
 
-	npc_healthbar_t healthbar = spawner.get_data("healthbar");
+	npc_healthbar_t healthbar = npc_healthbar_none;
+	if(spawner.has_data("healthbar")) {
+		healthbar = spawner.get_data("healthbar");
+	}
+
 	switch(healthbar) {
 		case npc_healthbar_normal: StrCat(tmp_classname, sizeof(tmp_classname), "_healthbar");
 		case npc_healthbar_tank: StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
@@ -351,38 +342,28 @@ stock bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner 
 
 static bool shared_npc_pop_spawn(CustomPopulationSpawner spawner, const float pos[3], ArrayList result)
 {
+	if(!expr_pop_spawn(spawner, pos, result)) {
+		return false;
+	}
+
 	if(result) {
-		int health = -1;
-		if(spawner.has_data("health")) {
-			health = spawner.get_data("health");
+		npc_healthbar_t healthbar = npc_healthbar_none;
+		if(spawner.has_data("healthbar")) {
+			healthbar = spawner.get_data("healthbar");
 		}
-
-		float model_scale = -1.0;
-		if(spawner.has_data("model_scale")) {
-			model_scale = spawner.get_data("model_scale");
-		}
-
-		npc_healthbar_t healthbar = spawner.get_data("healthbar");
 
 		int len = result.Length;
 		for(int i = 0; i < len; ++i) {
 			int entity = result.Get(i);
+			if(!IsValidEntity(entity)) {
+				return false;
+			}
 
 			switch(healthbar) {
 				case npc_healthbar_boss: {
 					HookEntityContextThink(entity, bosshealthbar_think, "ThinkBossHealthbar");
 					SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkBossHealthbar");
 				}
-			}
-
-			if(health != -1) {
-				SetEntProp(entity, Prop_Data, "m_iHealth", health);
-				SetEntProp(entity, Prop_Data, "m_iMaxHealth", health);
-			}
-
-			if(model_scale != -1.0) {
-				//TODO!!!!! scale hull
-				SetEntPropFloat(entity, Prop_Send, "m_flModelScale", model_scale);
 			}
 		}
 	}

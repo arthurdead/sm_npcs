@@ -13,7 +13,7 @@
 #include <clsobj_hack>
 #include <bit>
 #include <modifier_spawner>
-#include <expression_parser>
+#include <expr_pop>
 #include <wpnhack>
 #include <loadsoundscript>
 
