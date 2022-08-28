@@ -8,7 +8,12 @@ static int npc_health = 300;
 
 void hl2_helicopter_init()
 {
-	register_robot_nextbot_factory("npc_hl2_helicopter", "HL2Helicopter");
+	CustomEntityFactory factory = null;
+	register_nextbot_factory("npc_hl2_helicopter", "HL2Helicopter", _, _, factory);
+	factory.add_alias("npc_hl2_helicopter_bosshealthbar");
+
+	register_robot_nextbot_factory("npc_hl2_helicopter_healthbar", "HL2Helicopter");
+	register_tankboss_nextbot_factory("npc_hl2_helicopter_tankhealthbar", "HL2Helicopter");
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Helicopter");
 	spawner.Parse = base_npc_pop_parse;
@@ -48,15 +53,20 @@ void hl2_helicopter_precache(int entity)
 	npc_idle_anim = AnimatingLookupSequence(entity, "idle");
 
 	npc_rudder = AnimatingLookupPoseParameter(entity, "rudder");
+
+	LoadSoundScript("scripts/npc_sounds_attackheli.txt");
+
+	PrecacheScriptSound("NPC_AttackHelicopter.Rotors");
+	PrecacheScriptSound("NPC_AttackHelicopter.RotorBlast");
+	PrecacheScriptSound("NPC_AttackHelicopter.FireGun");
 }
 
 void hl2_helicopter_created(int entity)
 {
 	SDKHook(entity, SDKHook_SpawnPost, npc_spawn);
-	SDKHook(entity, SDKHook_ThinkPost, npc_think);
 }
 
-static void npc_think(int entity)
+static Action npc_think(int entity)
 {
 	INextBot bot = INextBot(entity);
 	ILocomotion locomotion = bot.LocomotionInterface;
@@ -67,6 +77,8 @@ static void npc_think(int entity)
 	npc_resolve_collisions(entity);
 
 	SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 1.0);
+
+	return Plugin_Continue;
 }
 
 static int npc_select_animation(IBodyCustom body, int entity, Activity act)
@@ -83,6 +95,7 @@ static void npc_spawn(int entity)
 
 	INextBot bot = INextBot(entity);
 	flying_npc_spawn(bot, entity, npc_health, view_as<float>({38.0, 38.0, 38.0}), 100.0, 500.0);
+	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
 	custom_locomotion.DesiredAltitude = 100.0;
@@ -91,4 +104,7 @@ static void npc_spawn(int entity)
 
 	IBodyCustom body = view_as<IBodyCustom>(bot.BodyInterface);
 	body.set_function("SelectAnimationSequence", npc_select_animation);
+
+	EmitGameSoundToAll("NPC_AttackHelicopter.Rotors", entity);
+	EmitGameSoundToAll("NPC_AttackHelicopter.RotorBlast", entity);
 }

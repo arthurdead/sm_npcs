@@ -18,10 +18,19 @@ static int npc_move_yaw = -1;
 
 static int npc_health = 300;
 
+static void npc_datamap_init(CustomDatamap datamap)
+{
+	datamap.add_prop("m_flIdleDelay", custom_prop_time);
+}
+
 void hl2_antlion_init()
 {
-	CustomDatamap datamap = register_robot_nextbot_factory("npc_hl2_antlion", "HL2Antlion");
-	datamap.add_prop("m_flIdleDelay", custom_prop_time);
+	CustomEntityFactory factory = null;
+	npc_datamap_init(register_nextbot_factory("npc_hl2_antlion", "HL2Antlion", _, _, factory));
+	factory.add_alias("npc_hl2_antlion_bosshealthbar");
+
+	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_antlion_healthbar", "HL2Antlion"));
+	npc_datamap_init(register_tankboss_nextbot_factory("npc_hl2_antlion_tankhealthbar", "HL2Antlion"));
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Antlion");
 	spawner.Parse = base_npc_pop_parse;
@@ -94,10 +103,9 @@ void hl2_antlion_precache(int entity)
 void hl2_antlion_created(int entity)
 {
 	SDKHook(entity, SDKHook_SpawnPost, npc_spawn);
-	SDKHook(entity, SDKHook_ThinkPost, npc_think);
 }
 
-static void npc_think(int entity)
+static Action npc_think(int entity)
 {
 	INextBot bot = INextBot(entity);
 	ILocomotion locomotion = bot.LocomotionInterface;
@@ -109,6 +117,8 @@ static void npc_think(int entity)
 
 	handle_playbackrate(entity, locomotion, body);
 	handle_move_yaw(entity, npc_move_yaw, locomotion);
+
+	return Plugin_Continue;
 }
 
 static Action npc_handle_animevent(int entity, animevent_t event)
@@ -137,6 +147,43 @@ static Action npc_handle_animevent(int entity, animevent_t event)
 	return Plugin_Continue;
 }
 
+static Activity npc_translate_act(IBodyCustom body, Activity act)
+{
+	switch(act) {
+		case ACT_IDLE_AGITATED: {
+			return ACT_IDLE;
+		}
+		case ACT_IDLE_STIMULATED: {
+			return ACT_IDLE;
+		}
+		case ACT_IDLE_RELAXED: {
+			return ACT_IDLE;
+		}
+
+		case ACT_RUN_AGITATED: {
+			return ACT_WALK;
+		}
+		case ACT_RUN_STIMULATED: {
+			return ACT_WALK;
+		}
+		case ACT_RUN_RELAXED: {
+			return ACT_WALK;
+		}
+
+		case ACT_WALK_AGITATED: {
+			return ACT_WALK;
+		}
+		case ACT_WALK_STIMULATED: {
+			return ACT_WALK;
+		}
+		case ACT_WALK_RELAXED: {
+			return ACT_WALK;
+		}
+	}
+
+	return act;
+}
+
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 {
 	EmitGameSoundToAll("NPC_Antlion.Pain", entity);
@@ -154,8 +201,12 @@ static void npc_spawn(int entity)
 
 	INextBot bot = INextBot(entity);
 	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 195.0, 354.90);
+	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(hl2_antlion_behavior, "HL2AntlionBehavior");
+
+	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
+	body_custom.set_function("TranslateActivity", npc_translate_act);
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 }

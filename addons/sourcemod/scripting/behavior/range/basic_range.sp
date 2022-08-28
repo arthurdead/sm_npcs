@@ -41,8 +41,10 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	ArousalType arousal = NEUTRAL;
 
+	bool sight_clear = false;
+
 	if(victim != -1) {
-		bool sight_clear = vision.IsLineOfSightClearToEntity(victim);
+		sight_clear = vision.IsLineOfSightClearToEntity(victim);
 
 		arousal = ALERT;
 
@@ -56,22 +58,13 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 			locomotion.FaceTowards(victim_center);
 
-			float my_center[3];
-			EntityWorldSpaceCenter(entity, my_center);
-
-			static float next_attack = 0.0;
-			if(next_attack < GetGameTime()) {
-				FireBulletsInfo_t bullets;
-				bullets.Init();
-				bullets.m_vecSpread = view_as<float>({24.0, 24.0, 24.0});
-				bullets.m_vecSrc = my_center;
-				SubtractVectors(victim_center, my_center, bullets.m_vecDirShooting);
-				bullets.m_nFlags |= FIRE_BULLETS_TEMPORARY_DANGER_SOUND;
-				bullets.m_pAttacker = entity;
-				bullets.m_flDistance = GetVectorLength(bullets.m_vecDirShooting) + 100.0;
-				bullets.m_iTracerFreq = 1;
-				FireBullets(entity, bullets);
-				next_attack = GetGameTime() + 0.1;
+			if(action.has_function("handle_fire")) {
+				Function func = action.get_function("handle_fire");
+				Call_StartFunction(null, func);
+				Call_PushCell(action);
+				Call_PushCell(entity);
+				Call_PushCell(victim);
+				Call_Finish();
 			}
 
 			arousal = INTENSE;
@@ -80,7 +73,7 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	body.Arousal = arousal;
 
-	shared_handle_anim(locomotion, body);
+	shared_handle_anim(locomotion, body, sight_clear, victim);
 
 	return BEHAVIOR_CONTINUE;
 }

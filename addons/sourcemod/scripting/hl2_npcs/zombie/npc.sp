@@ -15,10 +15,19 @@ static int npc_move_yaw = -1;
 
 static int npc_health = 300;
 
+static void npc_datamap_init(CustomDatamap datamap)
+{
+	datamap.add_prop("m_flNextMoanSound", custom_prop_time);
+}
+
 void hl2_zombie_init()
 {
-	CustomDatamap datamap = register_robot_nextbot_factory("npc_hl2_zombie", "HL2Zombie");
-	datamap.add_prop("m_flNextMoanSound", custom_prop_time);
+	CustomEntityFactory factory = null;
+	npc_datamap_init(register_nextbot_factory("npc_hl2_zombie", "HL2Zombie", _, _, factory));
+	factory.add_alias("npc_hl2_zombie_bosshealthbar");
+
+	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_zombie_healthbar", "HL2Zombie"));
+	npc_datamap_init(register_tankboss_nextbot_factory("npc_hl2_zombie_tankhealthbar", "HL2Zombie"));
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Zombie");
 	spawner.Parse = base_npc_pop_parse;
@@ -93,10 +102,9 @@ void hl2_zombie_precache(int entity)
 void hl2_zombie_created(int entity)
 {
 	SDKHook(entity, SDKHook_SpawnPost, npc_spawn);
-	SDKHook(entity, SDKHook_ThinkPost, npc_think);
 }
 
-static void npc_think(int entity)
+static Action npc_think(int entity)
 {
 	INextBot bot = INextBot(entity);
 	ILocomotion locomotion = bot.LocomotionInterface;
@@ -108,6 +116,8 @@ static void npc_think(int entity)
 
 	handle_playbackrate(entity, locomotion, body);
 	handle_move_yaw(entity, npc_move_yaw, locomotion);
+
+	return Plugin_Continue;
 }
 
 static Action npc_handle_animevent(int entity, animevent_t event)
@@ -137,7 +147,35 @@ static Action npc_handle_animevent(int entity, animevent_t event)
 static Activity npc_translate_act(IBodyCustom body, Activity act)
 {
 	switch(act) {
-		case ACT_RUN: return ACT_WALK;
+		case ACT_IDLE_AGITATED: {
+			return ACT_IDLE;
+		}
+		case ACT_IDLE_STIMULATED: {
+			return ACT_IDLE;
+		}
+		case ACT_IDLE_RELAXED: {
+			return ACT_IDLE;
+		}
+
+		case ACT_RUN_AGITATED: {
+			return ACT_WALK;
+		}
+		case ACT_RUN_STIMULATED: {
+			return ACT_WALK;
+		}
+		case ACT_RUN_RELAXED: {
+			return ACT_WALK;
+		}
+
+		case ACT_WALK_AGITATED: {
+			return ACT_WALK;
+		}
+		case ACT_WALK_STIMULATED: {
+			return ACT_WALK;
+		}
+		case ACT_WALK_RELAXED: {
+			return ACT_WALK;
+		}
 	}
 
 	return act;
@@ -162,6 +200,7 @@ static void npc_spawn(int entity)
 
 	INextBot bot = INextBot(entity);
 	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 45.0, 45.0);
+	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(hl2_zombie_behavior, "HL2ZombieBehavior");
 

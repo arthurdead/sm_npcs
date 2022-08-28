@@ -10,6 +10,9 @@
 #define EFL_KILLME (1 << 0)
 
 #define EF_NODRAW 0x020
+#define EF_BONEMERGE 0x001
+#define EF_BONEMERGE_FASTCULL 0x080
+#define EF_PARENT_ANIMATES 0x200
 
 #define MELEE_RANGE 55.0
 float MELEE_MINS[3] = {-24.0, -24.0, -82.0};
@@ -114,6 +117,22 @@ stock int get_player_count()
 	return players;
 }
 
+stock int create_bonemerge_model(int owner, const char[] model, const char[] attach)
+{
+	int merge = CreateEntityByName("prop_dynamic_override");
+	DispatchKeyValue(merge, "model", model);
+	DispatchSpawn(merge);
+	SetEntityOwner(merge, owner);
+	SetVariantString("!activator");
+	AcceptEntityInput(merge, "SetParent", owner);
+	int effects = GetEntProp(merge, Prop_Send, "m_fEffects");
+	effects |= EF_BONEMERGE|EF_BONEMERGE_FASTCULL|EF_PARENT_ANIMATES;
+	SetEntProp(merge, Prop_Send, "m_fEffects", effects);
+	SetVariantString(attach)
+	AcceptEntityInput(merge, "SetParentAttachment");
+	return merge;
+}
+
 stock void flying_npc_spawn(INextBot bot, int entity, int health, const float hull[3], float altitude, float acceleration)
 {
 	shared_npc_spawn(bot, entity, health, hull, altitude, acceleration, true);
@@ -132,6 +151,22 @@ static MRESReturn npc_loc_collide(ILocomotion locomotion, int other, bool &resul
 	}
 
 	return MRES_Ignored;
+}
+
+stock Action tankhealthbar_think(int entity, const char[] context)
+{
+	float health = float(GetEntProp(entity, Prop_Data, "m_iHealth"));
+	float maxhealth = float(GetEntProp(entity, Prop_Data, "m_iMaxHealth"));
+	SetEntPropFloat(entity, Prop_Send, "m_lastHealthPercentage", (health / maxhealth));
+	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
+	return Plugin_Continue;
+}
+
+stock Action bosshealthbar_think(int entity, const char[] context)
+{
+	monster_resource.LinkHealth(entity);
+	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
+	return Plugin_Continue;
 }
 
 static void shared_npc_spawn(INextBot bot, int entity, int health, const float hull[3], float walk_speed, float run_speed, bool fly = false)
@@ -180,6 +215,31 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 		//TODO!!!!! move this elsewhere
 		custom_locomotion.set_function("ShouldCollideWith", npc_loc_collide);
 	}
+
+	char classname[64];
+	GetEntityClassname(entity, classname, sizeof(classname));
+
+	int idx = StrContains(classname, "_healthbar");
+	if(idx != -1) {
+		SetEntProp(entity, Prop_Send, "m_eType", 2);
+		classname[idx] = '\0';
+	} else {
+		idx = StrContains(classname, "_tankhealthbar");
+		if(idx != -1) {
+			HookEntityContextThink(entity, tankhealthbar_think, "ThinkTankHealthbar");
+			SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkTankHealthbar");
+			classname[idx] = '\0';
+		} else {
+			idx = StrContains(classname, "_bosshealthbar");
+			if(idx != -1) {
+				HookEntityContextThink(entity, bosshealthbar_think, "ThinkBossHealthbar");
+				SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkBossHealthbar");
+				classname[idx] = '\0';
+			}
+		}
+	}
+
+	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
 }
 
 stock bool base_npc_pop_attrs(CustomPopulationSpawner spawner, AttributeType attr, int num)
@@ -206,11 +266,19 @@ stock int base_npc_pop_health(CustomPopulationSpawner spawner, int num, int heal
 	return health;
 }
 
+enum npc_healthbar_t
+{
+	npc_healthbar_none,
+	npc_healthbar_normal,
+	npc_healthbar_tank,
+	npc_healthbar_boss
+};
+
 stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 {
+	//TODO!!!! move both of these to expr_pop.sp
 	char health_expr[EXPR_STR_MAX];
 	data.GetString("HealthExpr", health_expr, EXPR_STR_MAX);
-
 	if(health_expr[0] != '\0') {
 		float health_fl = parse_expression(health_expr, npc_health_expr_varcb, npc_health_expr_funccb);
 		if(health_fl < 0.1) {
@@ -224,7 +292,6 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 
 		spawner.set_data("health", health);
 	}
-
 	float model_scale = data.GetFloat("ModelScale", -1.0);
 	if(model_scale != -1.0) {
 		if(model_scale < 0.1) {
@@ -232,6 +299,22 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 		}
 
 		spawner.set_data("model_scale", model_scale);
+	}
+
+	char healthbar_str[10];
+	data.GetString("Healthbar", healthbar_str, sizeof(healthbar_str));
+	if(StrEqual(healthbar_str, "None")) {
+		spawner.set_data("healthbar", npc_healthbar_none);
+	} else if(StrEqual(healthbar_str, "Normal")) {
+		spawner.set_data("healthbar", npc_healthbar_normal);
+	} else if(StrEqual(healthbar_str, "Tank")) {
+		spawner.set_data("healthbar", npc_healthbar_tank);
+	} else if(StrEqual(healthbar_str, "Boss")) {
+		spawner.set_data("healthbar", npc_healthbar_boss);
+	} else if(healthbar_str[0] == '\0') {
+		spawner.set_data("healthbar", npc_healthbar_normal);
+	} else {
+		return false;
 	}
 
 	if(!modifier_spawner_parse(spawner, data)) {
@@ -243,7 +326,16 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 
 stock bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner spawner, const float pos[3], ArrayList result)
 {
-	int entity = CreateEntityByName(classname);
+	char tmp_classname[64];
+	strcopy(tmp_classname, sizeof(tmp_classname), classname);
+
+	npc_healthbar_t healthbar = spawner.get_data("healthbar");
+	switch(healthbar) {
+		case npc_healthbar_normal: StrCat(tmp_classname, sizeof(tmp_classname), "_healthbar");
+		case npc_healthbar_tank: StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
+	}
+
+	int entity = CreateEntityByName(tmp_classname);
 	TeleportEntity(entity, pos);
 	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TF_TEAM_PVE_INVADERS);
 	DispatchSpawn(entity);
@@ -270,9 +362,18 @@ static bool shared_npc_pop_spawn(CustomPopulationSpawner spawner, const float po
 			model_scale = spawner.get_data("model_scale");
 		}
 
+		npc_healthbar_t healthbar = spawner.get_data("healthbar");
+
 		int len = result.Length;
 		for(int i = 0; i < len; ++i) {
 			int entity = result.Get(i);
+
+			switch(healthbar) {
+				case npc_healthbar_boss: {
+					HookEntityContextThink(entity, bosshealthbar_think, "ThinkBossHealthbar");
+					SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkBossHealthbar");
+				}
+			}
 
 			if(health != -1) {
 				SetEntProp(entity, Prop_Data, "m_iHealth", health);
@@ -565,9 +666,11 @@ stock void handle_playbackrate(int entity, ILocomotion locomotion, IBody body)
 	float playback_rate = 1.0;
 
 	if(locomotion.OnGround) {
+		float ground_speed = locomotion.GroundSpeed;
+
 		float anim_speed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
 		if(anim_speed < 0.1) {
-			if(body.IsActivity(ACT_RUN) || body.IsActivity(ACT_WALK)) {
+			if(ground_speed > 0.1) {
 				if(locomotion.Running) {
 					if(body_custom.has_data("run_anim_speed")) {
 						anim_speed = body_custom.get_data("run_anim_speed");
@@ -579,8 +682,6 @@ stock void handle_playbackrate(int entity, ILocomotion locomotion, IBody body)
 				}
 			}
 		}
-
-		float ground_speed = locomotion.GroundSpeed;
 
 		if(ground_speed > 0.1 && anim_speed > 0.1) {
 			playback_rate = (ground_speed / anim_speed);

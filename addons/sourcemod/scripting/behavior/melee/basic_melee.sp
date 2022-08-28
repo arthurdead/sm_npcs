@@ -45,8 +45,10 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	ArousalType arousal = NEUTRAL;
 
+	bool sight_clear = false;
+
 	if(victim != -1) {
-		bool sight_clear = vision.IsLineOfSightClearToEntity(victim);
+		sight_clear = vision.IsLineOfSightClearToEntity(victim);
 
 		arousal = ALERT;
 
@@ -131,7 +133,7 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	float swing_time = action.get_data("swing_time");
 	if(swing_time < GetGameTime()) {
-		shared_handle_anim(locomotion, body);
+		shared_handle_anim(locomotion, body, sight_clear, victim);
 
 		if(action.has_function("handle_idle")) {
 			Function func = action.get_function("handle_idle");

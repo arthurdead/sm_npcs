@@ -1,17 +1,35 @@
 #define THREAT_SPEED_MULT 1.2
 #define THREAT_SPEED_DIV 2.0
 
-void shared_handle_anim(ILocomotion locomotion, IBody body)
+void shared_handle_anim(ILocomotion locomotion, IBody body, bool sight_clear, int victim)
 {
 	float ground_speed = locomotion.GroundSpeed;
 	if(ground_speed > 0.1) {
 		if(locomotion.Running) {
-			body.StartActivity(ACT_RUN, NO_ACTIVITY_FLAGS);
+			if(sight_clear) {
+				body.StartActivity(ACT_RUN_AGITATED, NO_ACTIVITY_FLAGS);
+			} else if(victim != -1) {
+				body.StartActivity(ACT_RUN_STIMULATED, NO_ACTIVITY_FLAGS);
+			} else {
+				body.StartActivity(ACT_RUN_RELAXED, NO_ACTIVITY_FLAGS);
+			}
 		} else {
-			body.StartActivity(ACT_WALK, NO_ACTIVITY_FLAGS);
+			if(sight_clear) {
+				body.StartActivity(ACT_WALK_AGITATED, NO_ACTIVITY_FLAGS);
+			} if(victim != -1) {
+				body.StartActivity(ACT_WALK_STIMULATED, NO_ACTIVITY_FLAGS);
+			} else {
+				body.StartActivity(ACT_WALK_RELAXED, NO_ACTIVITY_FLAGS);
+			}
 		}
 	} else {
-		body.StartActivity(ACT_IDLE, NO_ACTIVITY_FLAGS);
+		if(sight_clear) {
+			body.StartActivity(ACT_IDLE_AGITATED, NO_ACTIVITY_FLAGS);
+		} else if(victim != -1) {
+			body.StartActivity(ACT_IDLE_STIMULATED, NO_ACTIVITY_FLAGS);
+		} else {
+			body.StartActivity(ACT_IDLE_RELAXED, NO_ACTIVITY_FLAGS);
+		}
 	}
 }
 

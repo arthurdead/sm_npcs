@@ -28,7 +28,6 @@ ConVar npc_deathnotice_eventtime;
 #include "behavior/range/basic_range.sp"
 #include "behavior/anim/play_anim.sp"
 
-#include "kf2_npcs/kf2_npcs.sp"
 #include "hl2_npcs/hl2_npcs.sp"
 
 static ConVar nav_authorative;
@@ -48,7 +47,6 @@ public void OnPluginStart()
 	basic_range_action_init();
 	play_anim_action_init();
 
-	kf2_npcs_init();
 	hl2_npcs_init();
 
 	nav_authorative = FindConVar("nav_authorative");
@@ -57,13 +55,20 @@ public void OnPluginStart()
 	npc_deathnotice_eventtime = FindConVar("npc_deathnotice_eventtime");
 
 	if(late_load) {
-		int entity = -1;
-		char classname[64];
-		while((entity = FindEntityByClassname(entity, "*")) != -1) {
-			GetEntityClassname(entity, classname, sizeof(classname));
-			OnEntityCreated(entity, classname);
-		}
+		CreateTimer(0.3, timer_plugin_loaded);
 	}
+}
+
+static Action timer_plugin_loaded(Handle timer, any data)
+{
+	int entity = -1;
+	char classname[64];
+	while((entity = FindEntityByClassname(entity, "*")) != -1) {
+		GetEntityClassname(entity, classname, sizeof(classname));
+		OnEntityCreated(entity, classname);
+	}
+
+	return Plugin_Continue;
 }
 
 public void OnConfigsExecuted()
@@ -81,7 +86,6 @@ public void OnMapStart()
 {
 	int entity = CreateEntityByName("prop_dynamic_override");
 
-	kf2_npcs_precache(entity);
 	hl2_npcs_precache(entity);
 
 	RemoveEntity(entity);
@@ -92,7 +96,6 @@ public void OnMapStart()
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	kf2_npcs_entity_created(entity, classname);
 	hl2_npcs_entity_created(entity, classname);
 }
 
@@ -105,12 +108,10 @@ public void OnEntityDestroyed(int entity)
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
-	kf2_npcs_entity_destroyed(entity, classname);
 	hl2_npcs_entity_destroyed(entity, classname);
 }
 
 public void OnPluginEnd()
 {
-	kf2_npcs_plugin_end();
 	hl2_npcs_plugin_end();
 }
