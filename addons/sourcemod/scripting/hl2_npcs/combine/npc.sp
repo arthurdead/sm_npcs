@@ -1,7 +1,5 @@
 int hl2_pistol_muzzle = -1;
 
-ConVar sk_
-
 #include "behavior.sp"
 
 static int npc_move_yaw = -1;
@@ -19,9 +17,8 @@ void hl2_combine_init()
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_combine", "HL2Combine", _, _, factory));
-	factory.add_alias("npc_hl2_combine_bosshealthbar");
 
-	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_combine_healthbar", "HL2Combine"));
+	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_combine_robothealthbar", "HL2Combine"));
 	npc_datamap_init(register_tankboss_nextbot_factory("npc_hl2_combine_tankhealthbar", "HL2Combine"));
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Combine");

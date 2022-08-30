@@ -36,9 +36,8 @@ void hl2_zombie_init()
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_zombie", "HL2Zombie", _, _, factory));
-	factory.add_alias("npc_hl2_zombie_bosshealthbar");
 
-	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_zombie_healthbar", "HL2Zombie"));
+	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_zombie_robothealthbar", "HL2Zombie"));
 	npc_datamap_init(register_tankboss_nextbot_factory("npc_hl2_zombie_tankhealthbar", "HL2Zombie"));
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Zombie");

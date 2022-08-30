@@ -162,13 +162,6 @@ stock Action tankhealthbar_think(int entity, const char[] context)
 	return Plugin_Continue;
 }
 
-stock Action bosshealthbar_think(int entity, const char[] context)
-{
-	monster_resource.LinkHealth(entity);
-	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
-	return Plugin_Continue;
-}
-
 static void shared_npc_spawn(INextBot bot, int entity, int health, const float hull[3], float walk_speed, float run_speed, bool fly = false)
 {
 	AnyLocomotion custom_locomotion = bot.AllocateLocomotion(fly);
@@ -219,36 +212,26 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
-	int idx = StrContains(classname, "_healthbar");
+	int idx = StrContains(classname, "_robothealthbar");
 	if(idx != -1) {
-		SetEntProp(entity, Prop_Send, "m_eType", 2);
 		classname[idx] = '\0';
+
+		SetEntProp(entity, Prop_Send, "m_eType", 2);
 	} else {
 		idx = StrContains(classname, "_tankhealthbar");
 		if(idx != -1) {
+			classname[idx] = '\0';
+
 			HookEntityContextThink(entity, tankhealthbar_think, "ThinkTankHealthbar");
 			SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkTankHealthbar");
-			classname[idx] = '\0';
-		} else {
-			idx = StrContains(classname, "_bosshealthbar");
-			if(idx != -1) {
-				HookEntityContextThink(entity, bosshealthbar_think, "ThinkBossHealthbar");
-				SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkBossHealthbar");
-				classname[idx] = '\0';
-			}
 		}
 	}
 
 	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
 }
 
-enum npc_healthbar_t
-{
-	npc_healthbar_none,
-	npc_healthbar_normal,
-	npc_healthbar_tank,
-	npc_healthbar_boss
-};
+#define npc_healthbar_robot (view_as<entity_healthbar_t>(view_as<int>(entity_healthbar_last)+0))
+#define npc_healthbar_tank  (view_as<entity_healthbar_t>(view_as<int>(entity_healthbar_last)+1))
 
 stock bool base_npc_pop_attrs(CustomPopulationSpawner spawner, AttributeType attr, int num)
 {
@@ -258,15 +241,13 @@ stock bool base_npc_pop_attrs(CustomPopulationSpawner spawner, AttributeType att
 
 	AttributeType flags = NPC_POP_FLAGS;
 
-	npc_healthbar_t healthbar = npc_healthbar_none;
+	entity_healthbar_t healthbar = entity_healthbar_none;
 	if(spawner.has_data("healthbar")) {
 		healthbar = spawner.get_data("healthbar");
 	}
 
 	if(healthbar == npc_healthbar_tank) {
 		flags |= MINIBOSS;
-	} else if(healthbar == npc_healthbar_boss) {
-		flags |= (MINIBOSS|USE_BOSS_HEALTH_BAR);
 	}
 
 	return !!(flags & attr);
@@ -289,19 +270,11 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 	}
 
 	char healthbar_str[7];
-	data.GetString("Healthbar", healthbar_str, sizeof(healthbar_str));
-	if(StrEqual(healthbar_str, "None")) {
-		spawner.set_data("healthbar", npc_healthbar_none);
-	} else if(StrEqual(healthbar_str, "Normal")) {
-		spawner.set_data("healthbar", npc_healthbar_normal);
+	data.GetString("HealthBar", healthbar_str, sizeof(healthbar_str));
+	if(StrEqual(healthbar_str, "Robot")) {
+		spawner.set_data("healthbar", npc_healthbar_robot);
 	} else if(StrEqual(healthbar_str, "Tank")) {
 		spawner.set_data("healthbar", npc_healthbar_tank);
-	} else if(StrEqual(healthbar_str, "Boss")) {
-		spawner.set_data("healthbar", npc_healthbar_boss);
-	} else if(healthbar_str[0] == '\0') {
-		spawner.set_data("healthbar", npc_healthbar_normal);
-	} else {
-		return false;
 	}
 
 	if(!modifier_spawner_parse(spawner, data)) {
@@ -316,13 +289,13 @@ stock bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner 
 	char tmp_classname[64];
 	strcopy(tmp_classname, sizeof(tmp_classname), classname);
 
-	npc_healthbar_t healthbar = npc_healthbar_none;
+	entity_healthbar_t healthbar = entity_healthbar_none;
 	if(spawner.has_data("healthbar")) {
 		healthbar = spawner.get_data("healthbar");
 	}
 
 	switch(healthbar) {
-		case npc_healthbar_normal: StrCat(tmp_classname, sizeof(tmp_classname), "_healthbar");
+		case npc_healthbar_robot: StrCat(tmp_classname, sizeof(tmp_classname), "_robothealthbar");
 		case npc_healthbar_tank: StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
 	}
 
@@ -344,28 +317,6 @@ static bool shared_npc_pop_spawn(CustomPopulationSpawner spawner, const float po
 {
 	if(!expr_pop_spawn(spawner, pos, result)) {
 		return false;
-	}
-
-	if(result) {
-		npc_healthbar_t healthbar = npc_healthbar_none;
-		if(spawner.has_data("healthbar")) {
-			healthbar = spawner.get_data("healthbar");
-		}
-
-		int len = result.Length;
-		for(int i = 0; i < len; ++i) {
-			int entity = result.Get(i);
-			if(!IsValidEntity(entity)) {
-				return false;
-			}
-
-			switch(healthbar) {
-				case npc_healthbar_boss: {
-					HookEntityContextThink(entity, bosshealthbar_think, "ThinkBossHealthbar");
-					SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkBossHealthbar");
-				}
-			}
-		}
 	}
 
 	if(!modifier_spawner_spawn(spawner, pos, result)) {

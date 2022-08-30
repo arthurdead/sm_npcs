@@ -29,9 +29,8 @@ void hl2_antlion_init()
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_antlion", "HL2Antlion", _, _, factory));
-	factory.add_alias("npc_hl2_antlion_bosshealthbar");
 
-	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_antlion_healthbar", "HL2Antlion"));
+	npc_datamap_init(register_robot_nextbot_factory("npc_hl2_antlion_robothealthbar", "HL2Antlion"));
 	npc_datamap_init(register_tankboss_nextbot_factory("npc_hl2_antlion_tankhealthbar", "HL2Antlion"));
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Antlion");

@@ -14,9 +14,8 @@ void hl2_helicopter_init()
 
 	CustomEntityFactory factory = null;
 	register_nextbot_factory("npc_hl2_helicopter", "HL2Helicopter", _, _, factory);
-	factory.add_alias("npc_hl2_helicopter_bosshealthbar");
 
-	register_robot_nextbot_factory("npc_hl2_helicopter_healthbar", "HL2Helicopter");
+	register_robot_nextbot_factory("npc_hl2_helicopter_robothealthbar", "HL2Helicopter");
 	register_tankboss_nextbot_factory("npc_hl2_helicopter_tankhealthbar", "HL2Helicopter");
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("HL2Helicopter");
