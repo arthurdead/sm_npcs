@@ -6,10 +6,12 @@ static int npc_idle_anim = -1;
 
 static int npc_rudder = -1;
 
-static int npc_health = 300;
+static ConVar npc_health_cvar;
 
 void hl2_helicopter_init()
 {
+	npc_health_cvar = CreateConVar("sk_helicopter_health", "1000");
+
 	CustomEntityFactory factory = null;
 	register_nextbot_factory("npc_hl2_helicopter", "HL2Helicopter", _, _, factory);
 	factory.add_alias("npc_hl2_helicopter_bosshealthbar");
@@ -39,7 +41,7 @@ static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
 
 static int npc_pop_health(CustomPopulationSpawner spawner, int num)
 {
-	return base_npc_pop_health(spawner, num, npc_health);
+	return base_npc_pop_health(spawner, num, npc_health_cvar.IntValue);
 }
 
 static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
@@ -90,6 +92,11 @@ static int npc_select_animation(IBodyCustom body, int entity, Activity act)
 	return npc_idle_anim;
 }
 
+static Activity npc_translate_act(IBodyCustom body, Activity act)
+{
+	return ACT_IDLE;
+}
+
 static void npc_spawn(int entity)
 {
 	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 0.5);
@@ -98,7 +105,7 @@ static void npc_spawn(int entity)
 	SetEntPropString(entity, Prop_Data, "m_iName", "Helicopter");
 
 	INextBot bot = INextBot(entity);
-	flying_npc_spawn(bot, entity, npc_health, view_as<float>({38.0, 38.0, 38.0}), 100.0, 500.0);
+	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({38.0, 38.0, 38.0}), 100.0, 500.0);
 	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
@@ -106,8 +113,9 @@ static void npc_spawn(int entity)
 
 	bot.AllocateCustomIntention(hl2_helicopter_behavior, "HL2HelicopterBehavior");
 
-	IBodyCustom body = view_as<IBodyCustom>(bot.BodyInterface);
-	body.set_function("SelectAnimationSequence", npc_select_animation);
+	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
+	body_custom.set_function("SelectAnimationSequence", npc_select_animation);
+	body_custom.set_function("TranslateActivity", npc_translate_act);
 
 	EmitGameSoundToAll("NPC_AttackHelicopter.Rotors", entity);
 	EmitGameSoundToAll("NPC_AttackHelicopter.RotorBlast", entity);

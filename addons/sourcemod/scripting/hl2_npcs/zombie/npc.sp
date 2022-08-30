@@ -1,3 +1,5 @@
+ConVar zombie_moanfreq;
+
 #include "behavior.sp"
 
 static Activity ACT_ZOM_RELEASECRAB = ACT_INVALID;
@@ -13,7 +15,10 @@ static int AE_ZOMBIE_SCUFF_RIGHT = -1;
 
 static int npc_move_yaw = -1;
 
-static int npc_health = 300;
+static ConVar npc_health_cvar;
+
+static ConVar sk_zombie_dmg_one_slash;
+static ConVar sk_zombie_dmg_both_slash;
 
 static void npc_datamap_init(CustomDatamap datamap)
 {
@@ -22,6 +27,13 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_zombie_init()
 {
+	npc_health_cvar = CreateConVar("sk_zombie_health", "1000");
+
+	sk_zombie_dmg_one_slash = CreateConVar("sk_zombie_dmg_one_slash", "10");
+	sk_zombie_dmg_both_slash = CreateConVar("sk_zombie_dmg_both_slash", "25");
+
+	zombie_moanfreq = CreateConVar("zombie_moanfreq", "4");
+
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_zombie", "HL2Zombie", _, _, factory));
 	factory.add_alias("npc_hl2_zombie_bosshealthbar");
@@ -51,7 +63,7 @@ static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
 
 static int npc_pop_health(CustomPopulationSpawner spawner, int num)
 {
-	return base_npc_pop_health(spawner, num, npc_health);
+	return base_npc_pop_health(spawner, num, npc_health_cvar.IntValue);
 }
 
 static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
@@ -131,9 +143,11 @@ static Action npc_handle_animevent(int entity, animevent_t event)
 	} else if(event.event == AE_ZOMBIE_SCUFF_RIGHT) {
 		EmitGameSoundToAll("Zombie.ScuffRight", entity);
 	} else if(event.event == AE_ZOMBIE_ATTACK_RIGHT ||
-		event.event == AE_ZOMBIE_ATTACK_LEFT ||
-		event.event == AE_ZOMBIE_ATTACK_BOTH) {
-		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+				event.event == AE_ZOMBIE_ATTACK_LEFT ||
+				event.event == AE_ZOMBIE_ATTACK_BOTH) {
+		int damage = (event.event == AE_ZOMBIE_ATTACK_BOTH) ? sk_zombie_dmg_both_slash.IntValue : sk_zombie_dmg_one_slash.IntValue;
+
+		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, damage, DMG_SLASH|DMG_CLUB, 1.0, true);
 		if(hit != -1) {
 			EmitGameSoundToAll("Zombie.AttackHit", entity);
 		} else {
@@ -199,7 +213,7 @@ static void npc_spawn(int entity)
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 45.0, 45.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 45.0, 45.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(hl2_zombie_behavior, "HL2ZombieBehavior");

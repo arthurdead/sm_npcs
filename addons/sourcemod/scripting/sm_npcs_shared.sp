@@ -649,17 +649,15 @@ stock void handle_playbackrate(int entity, ILocomotion locomotion, IBody body)
 	if(locomotion.OnGround) {
 		float ground_speed = locomotion.GroundSpeed;
 
-		float anim_speed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
-		if(anim_speed < 0.1) {
-			if(ground_speed > 0.1) {
-				if(locomotion.Running) {
-					if(body_custom.has_data("run_anim_speed")) {
-						anim_speed = body_custom.get_data("run_anim_speed");
-					}
-				} else {
-					if(body_custom.has_data("walk_anim_speed")) {
-						anim_speed = body_custom.get_data("walk_anim_speed");
-					}
+		float anim_speed = 0.0;
+		if(ground_speed > 0.1) {
+			if(locomotion.Running) {
+				if(body_custom.has_data("run_anim_speed")) {
+					anim_speed = body_custom.get_data("run_anim_speed");
+				}
+			} else {
+				if(body_custom.has_data("walk_anim_speed")) {
+					anim_speed = body_custom.get_data("walk_anim_speed");
 				}
 			}
 		}
@@ -690,6 +688,7 @@ stock void handle_move_yaw(int entity, int pose, ILocomotion locomotion)
 	float fwd[3];
 	float right[3];
 	GetAngleVectors(ang, fwd, right, NULL_VECTOR);
+	NegateVector(right);
 
 	float velocity[3];
 	locomotion.GetVelocity(velocity);

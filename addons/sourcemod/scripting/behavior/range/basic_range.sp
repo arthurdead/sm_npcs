@@ -5,9 +5,18 @@ void basic_range_action_init()
 	basic_range_action = new BehaviorActionEntry("BasicRange");
 	basic_range_action.set_function("OnStart", action_start);
 	basic_range_action.set_function("Update", action_update);
-	basic_range_action.set_function("OnEnd", shared_end_chase);
-	basic_range_action.set_function("OnStuck", shared_stuck_chase);
+	basic_range_action.set_function("OnEnd", action_end);
+	basic_range_action.set_function("OnStuck", shared_stuck);
 	basic_range_action.set_function("OnKilled", shared_killed);
+}
+
+static void action_end(BehaviorAction action, INextBot bot, int entity, BehaviorAction next)
+{
+	ArrayList stopped_areas = action.get_data("stopped_areas");
+	delete stopped_areas;
+
+	PathFollower path = action.get_data("path");
+	delete path;
 }
 
 static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
@@ -17,7 +26,27 @@ static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int 
 
 	action.set_data("attack_time", 0.0);
 
-	return shared_start_chase(action, bot, entity, prior, result);
+	action.set_data("stopped", false);
+
+	float stopped_pos[3];
+	action.set_data_array("stopped_pos", stopped_pos, 3);
+
+	float stopped_area_pos[3];
+	action.set_data_array("stopped_area_pos", stopped_area_pos, 3);
+
+	action.set_data("stopped_areas", new ArrayList());
+
+	action.set_data("stopped_area_change_time", 0.0);
+
+	action.set_data("stopped_area_pos_change_time", 0.0);
+
+	action.set_data("stopped_area", CNavArea_Null);
+
+	PathFollower path = new PathFollower();
+	shared_path_init(path);
+	action.set_data("path", path);
+
+	return BEHAVIOR_CONTINUE;
 }
 
 static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
@@ -43,21 +72,38 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	bool sight_clear = false;
 
+	shared_handle_speed(entity, bot, locomotion, body, victim);
+
+	bool pathing = false;
+
+	PathFollower path = action.get_data("path");
+
 	if(victim != -1) {
 		sight_clear = vision.IsLineOfSightClearToEntity(victim);
 
 		arousal = ALERT;
-
-		if(bot.IsRangeGreaterThanEntity(victim, chase_range) || !sight_clear) {
-			shared_update_chase(action, entity, bot, locomotion, body, victim);
-		}
 
 		if(sight_clear) {
 			float victim_center[3];
 			EntityWorldSpaceCenter(victim, victim_center);
 
 			locomotion.FaceTowards(victim_center);
+		}
 
+		if(bot.IsRangeGreaterThanEntity(victim, chase_range) || !sight_clear) {
+			if(action.get_data("stopped")) {
+				path.Invalidate();
+				action.set_data("stopped", false);
+			}
+
+			if(path.Age > 1.0) {
+				path.ComputeEntity(bot, victim, baseline_path_cost, cost_flags_safest|cost_flags_mod_small);
+			}
+
+			pathing = true;
+		}
+
+		if(sight_clear) {
 			if(action.has_function("handle_fire")) {
 				Function func = action.get_function("handle_fire");
 				Call_StartFunction(null, func);
@@ -71,9 +117,105 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 		}
 	}
 
-	body.Arousal = arousal;
-
 	shared_handle_anim(locomotion, body, sight_clear, victim);
+
+	float ground_speed = locomotion.GroundSpeed;
+
+	if(!pathing) {
+		float feet[3];
+		locomotion.GetFeet(feet);
+
+		float stopped_pos[3];
+		action.get_data_array("stopped_pos", stopped_pos, 3);
+
+		NDebugOverlay_Box(stopped_pos, VEC_HULL_MINS, VEC_HULL_MAXS, 255, 0, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
+
+		bool just_stopped = false;
+
+		if(!action.get_data("stopped")) {
+			stopped_pos = feet;
+			action.set_data_array("stopped_pos", feet, 3);
+			PrintToServer("stopped");
+			action.set_data("stopped", true);
+			just_stopped = true;
+		}
+
+		ArrayList stopped_areas = action.get_data("stopped_areas");
+
+		if(just_stopped) {
+			stopped_areas.Clear();
+
+			CNavArea victim_area = CNavArea_Null;
+			if(victim != -1) {
+				victim_area = GetEntityLastKnownArea(victim);
+			}
+
+			CNavArea start_area = GetEntityLastKnownArea(entity);
+			if(start_area != CNavArea_Null) {
+				ArrayList tmp_areas = new ArrayList();
+				CollectSurroundingAreas(tmp_areas, start_area, 1000.0, locomotion.StepHeight, locomotion.DeathDropHeight);
+				int len = tmp_areas.Length;
+				for(int j = 0; j < len; ++j) {
+					CTFNavArea area = tmp_areas.Get(j);
+
+					if(!area.ValidForWanderingPopulation) {
+						continue;
+					}
+
+					if(victim_area != CNavArea_Null && area == victim_area) {
+						continue;
+					}
+
+					if(stopped_areas.FindValue(area) == -1) {
+						stopped_areas.Push(area);
+					}
+				}
+				delete tmp_areas;
+			}
+
+			PrintToServer("calculated stopped areas");
+			action.set_data("stopped_areas", stopped_areas);
+		}
+
+		CNavArea stopped_area = action.get_data("stopped_area");
+
+		float stopped_area_pos_change_time = action.get_data("stopped_area_pos_change_time");
+
+		float stopped_area_change_time = action.get_data("stopped_area_change_time");
+		if(stopped_area_change_time < GetGameTime()) {
+			int len = stopped_areas.Length;
+			if(len > 0) {
+				stopped_area = stopped_areas.Get(GetURandomInt() % len);
+				action.set_data("stopped_area", stopped_area);
+				stopped_area_pos_change_time = 0.0;
+				path.Invalidate();
+			}
+			PrintToServer("got random area");
+			action.set_data("stopped_area_change_time", GetGameTime() + 5.0);
+		}
+
+		float stopped_area_pos[3];
+		action.get_data_array("stopped_area_pos", stopped_area_pos, 3);
+
+		if(stopped_area_pos_change_time < GetGameTime()) {
+			if(stopped_area != CNavArea_Null) {
+				stopped_area.GetRandomPoint(stopped_area_pos);
+				action.set_data_array("stopped_area_pos", stopped_area_pos, 3);
+				path.ComputeVector(bot, stopped_area_pos, baseline_path_cost, cost_flags_safest|cost_flags_mod_small);
+				PrintToServer("path to %f, %f, %f", stopped_area_pos[0], stopped_area_pos[1], stopped_area_pos[2]);
+			}
+			PrintToServer("got random area pos");
+			action.set_data("stopped_area_pos_change_time", GetGameTime() + 0.5);
+		}
+
+		NDebugOverlay_Box(stopped_area_pos, VEC_HULL_MINS, VEC_HULL_MAXS, 0, 0, 255, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
+	}
+
+	path.AllowFacing = !sight_clear;
+	path.Update(bot);
+	path.AllowFacing = true;
+
+	body.Arousal = arousal;
 
 	return BEHAVIOR_CONTINUE;
 }

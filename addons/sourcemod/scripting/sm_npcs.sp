@@ -74,7 +74,7 @@ static Action timer_plugin_loaded(Handle timer, any data)
 public void OnConfigsExecuted()
 {
 	nav_authorative.BoolValue = false;
-	path_expensive_optimize.BoolValue = false;
+	path_expensive_optimize.BoolValue = true;
 
 	FindConVar("ai_show_hull_attacks").BoolValue = true;
 

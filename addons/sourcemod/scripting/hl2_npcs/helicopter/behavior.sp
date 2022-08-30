@@ -10,7 +10,7 @@ static void handle_fire(BehaviorAction action, int entity, int victim)
 
 		FireBulletsInfo_t bullets;
 		bullets.Init();
-		bullets.m_vecSpread = view_as<float>({24.0, 24.0, 24.0});
+		bullets.m_vecSpread = view_as<float>({45.0, 45.0, 45.0});
 		bullets.m_vecSrc = muzzle;
 		SubtractVectors(victim_center, muzzle, bullets.m_vecDirShooting);
 		bullets.m_nFlags |= FIRE_BULLETS_TEMPORARY_DANGER_SOUND;
@@ -20,7 +20,7 @@ static void handle_fire(BehaviorAction action, int entity, int victim)
 
 		FireBullets(entity, bullets);
 
-		action.set_data("attack_time", GetGameTime() + 1.0);
+		action.set_data("attack_time", GetGameTime() + 0.1);
 	}
 }
 

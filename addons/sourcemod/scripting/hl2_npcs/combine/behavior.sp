@@ -23,12 +23,15 @@ static void handle_fire(BehaviorAction action, int entity, int victim)
 		bullets.m_flDistance = GetVectorLength(bullets.m_vecDirShooting) + 100.0;
 		bullets.m_iTracerFreq = 1;
 
+		bullets.m_flDamage = 15.0;
+		bullets.m_iPlayerDamage = 15;
+
 		FireBullets(entity, bullets);
 
-		IBody body = INextBot(entity).BodyInterface;
-		body.StartActivity(ACT_RANGE_ATTACK1, ACTIVITY_TRANSITORY);
+		//IBody body = INextBot(entity).BodyInterface;
+		//body.StartActivity(ACT_RANGE_ATTACK1, ACTIVITY_TRANSITORY);
 
-		action.set_data("attack_time", GetGameTime() + 1.0);
+		action.set_data("attack_time", GetGameTime() + 0.5);
 	}
 }
 

@@ -5,9 +5,15 @@ void basic_melee_action_init()
 	basic_melee_action = new BehaviorActionEntry("BasicMelee");
 	basic_melee_action.set_function("OnStart", action_start);
 	basic_melee_action.set_function("Update", action_update);
-	basic_melee_action.set_function("OnEnd", shared_end_chase);
-	basic_melee_action.set_function("OnStuck", shared_stuck_chase);
+	basic_melee_action.set_function("OnEnd", action_end);
+	basic_melee_action.set_function("OnStuck", shared_stuck);
 	basic_melee_action.set_function("OnKilled", shared_killed);
+}
+
+static void action_end(BehaviorAction action, INextBot bot, int entity, BehaviorAction next)
+{
+	DirectChasePath path = action.get_data("path");
+	delete path;
 }
 
 static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
@@ -20,7 +26,11 @@ static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int 
 
 	action.set_data("move_while_swing", 0);
 
-	return shared_start_chase(action, bot, entity, prior, result);
+	DirectChasePath path = new DirectChasePath(LEAD_SUBJECT);
+	shared_path_init(path);
+	action.set_data("path", path);
+
+	return BEHAVIOR_CONTINUE;
 }
 
 static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
@@ -47,10 +57,22 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 
 	bool sight_clear = false;
 
+	shared_handle_speed(entity, bot, locomotion, body, victim);
+
 	if(victim != -1) {
 		sight_clear = vision.IsLineOfSightClearToEntity(victim);
 
 		arousal = ALERT;
+
+		bool in_attack_range = bot.IsRangeLessThanEntity(victim, attack_range);
+		bool should_face = (in_attack_range && sight_clear);
+
+		if(should_face) {
+			float victim_center[3];
+			EntityWorldSpaceCenter(victim, victim_center);
+
+			locomotion.FaceTowards(victim_center);
+		}
 
 		if(bot.IsRangeGreaterThanEntity(victim, chase_range) || !sight_clear) {
 			bool should_move = true;
@@ -63,11 +85,14 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 			}
 
 			if(should_move) {
-				shared_update_chase(action, entity, bot, locomotion, body, victim);
+				DirectChasePath path = action.get_data("path");
+				path.AllowFacing = !should_face;
+				path.Update(bot, victim, baseline_path_cost, cost_flags_safest|cost_flags_mod_small);
+				path.AllowFacing = true;
 			}
 		}
 
-		if(bot.IsRangeLessThanEntity(victim, attack_range)) {
+		if(in_attack_range) {
 			float ang[3];
 			GetEntPropVector(entity, Prop_Data, "m_angRotation", ang);
 
@@ -119,10 +144,6 @@ static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int
 						}
 					}
 				}
-			}
-
-			if(sight_clear) {
-				locomotion.FaceTowards(victim_center);
 			}
 
 			arousal = INTENSE;

@@ -16,7 +16,7 @@ void shared_handle_anim(ILocomotion locomotion, IBody body, bool sight_clear, in
 		} else {
 			if(sight_clear) {
 				body.StartActivity(ACT_WALK_AGITATED, NO_ACTIVITY_FLAGS);
-			} if(victim != -1) {
+			} else if(victim != -1) {
 				body.StartActivity(ACT_WALK_STIMULATED, NO_ACTIVITY_FLAGS);
 			} else {
 				body.StartActivity(ACT_WALK_RELAXED, NO_ACTIVITY_FLAGS);
@@ -171,9 +171,9 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 	}
 }
 
-BehaviorResultType shared_stuck_chase(BehaviorAction action, INextBot bot, int entity, BehaviorResult result)
+BehaviorResultType shared_stuck(BehaviorAction action, INextBot bot, int entity, BehaviorResult result)
 {
-	DirectChasePath path = action.get_data("path");
+	PathFollower path = bot.CurrentPath;
 
 	if(path.CurrentGoal != Segment_Null) {
 		float pos[3];
@@ -185,22 +185,10 @@ BehaviorResultType shared_stuck_chase(BehaviorAction action, INextBot bot, int e
 	return BEHAVIOR_CONTINUE;
 }
 
-void shared_end_chase(BehaviorAction action, INextBot bot, int entity, BehaviorAction next)
+void shared_path_init(PathFollower path)
 {
-	DirectChasePath path = action.get_data("path");
-	delete path;
-}
-
-BehaviorResultType shared_start_chase(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
-{
-	DirectChasePath path = new DirectChasePath(LEAD_SUBJECT);
-	path.GoalTolerance = 0.0;
+	path.GoalTolerance = 25.0;
 	path.MinLookAheadDistance = 300.0;
-	path.LeadRadius = 500.0;
-
-	action.set_data("path", path);
-
-	return BEHAVIOR_CONTINUE;
 }
 
 BehaviorResultType shared_killed(BehaviorAction action, INextBot bot, int entity, const CTakeDamageInfo info, BehaviorResult result)
@@ -208,10 +196,6 @@ BehaviorResultType shared_killed(BehaviorAction action, INextBot bot, int entity
 	CombatCharacterEventKilled(entity, info);
 
 	if(AnimatingSelectWeightedSequence(entity, ACT_DIERAGDOLL) == -1) {
-		int flags = GetEntProp(entity, Prop_Send, "m_fEffects");
-		flags |= EF_NODRAW;
-		SetEntProp(entity, Prop_Send, "m_fEffects", flags);
-
 		RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
 	}
 
@@ -227,16 +211,18 @@ BehaviorResultType shared_killed(BehaviorAction action, INextBot bot, int entity
 	return BEHAVIOR_DONE;
 }
 
-void shared_update_chase(BehaviorAction action, int entity, INextBot bot, ILocomotion locomotion, IBody body, int victim)
+void shared_handle_speed(int entity, INextBot bot, ILocomotion locomotion, IBody body, int victim)
 {
 	float targetspeed = 0.0;
-	if(victim >= 1 && victim <= MaxClients) {
-		targetspeed = get_player_class_speed(victim);
-	} else {
-		INextBot victim_bot = INextBot(victim);
-		if(victim_bot != INextBot_Null) {
-			ILocomotion victim_locomotion = victim_bot.LocomotionInterface;
-			targetspeed = victim_locomotion.RunSpeed;
+	if(victim != -1) {
+		if(victim >= 1 && victim <= MaxClients) {
+			targetspeed = get_player_class_speed(victim);
+		} else {
+			INextBot victim_bot = INextBot(victim);
+			if(victim_bot != INextBot_Null) {
+				ILocomotion victim_locomotion = victim_bot.LocomotionInterface;
+				targetspeed = victim_locomotion.RunSpeed;
+			}
 		}
 	}
 
@@ -245,16 +231,14 @@ void shared_update_chase(BehaviorAction action, int entity, INextBot bot, ILocom
 
 	bool running = locomotion.Running;
 
-	float anim_speed = GetEntPropFloat(entity, Prop_Data, "m_flGroundSpeed");
-	if(anim_speed < 0.1) {
-		if(running) {
-			if(body_custom.has_data("run_anim_speed")) {
-				anim_speed = body_custom.get_data("run_anim_speed");
-			}
-		} else {
-			if(body_custom.has_data("walk_anim_speed")) {
-				anim_speed = body_custom.get_data("walk_anim_speed");
-			}
+	float anim_speed = 0.0;
+	if(running) {
+		if(body_custom.has_data("run_anim_speed")) {
+			anim_speed = body_custom.get_data("run_anim_speed");
+		}
+	} else {
+		if(body_custom.has_data("walk_anim_speed")) {
+			anim_speed = body_custom.get_data("walk_anim_speed");
 		}
 	}
 
@@ -285,7 +269,4 @@ void shared_update_chase(BehaviorAction action, int entity, INextBot bot, ILocom
 			custom_locomotion.WalkSpeed = speed;
 		}
 	}
-
-	DirectChasePath path = action.get_data("path");
-	path.Update(bot, victim, baseline_path_cost, cost_flags_safest|cost_flags_mod_small);
 }

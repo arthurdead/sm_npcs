@@ -1,10 +1,12 @@
 int hl2_pistol_muzzle = -1;
 
+ConVar sk_
+
 #include "behavior.sp"
 
 static int npc_move_yaw = -1;
 
-static int npc_health = 300;
+static ConVar npc_health_cvar;
 
 static void npc_datamap_init(CustomDatamap datamap)
 {
@@ -13,6 +15,8 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_combine_init()
 {
+	npc_health_cvar = CreateConVar("sk_combine_health", "1000");
+
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_combine", "HL2Combine", _, _, factory));
 	factory.add_alias("npc_hl2_combine_bosshealthbar");
@@ -42,7 +46,7 @@ static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
 
 static int npc_pop_health(CustomPopulationSpawner spawner, int num)
 {
-	return base_npc_pop_health(spawner, num, npc_health);
+	return base_npc_pop_health(spawner, num, npc_health_cvar.IntValue);
 }
 
 static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayList result)
@@ -146,7 +150,7 @@ static void npc_spawn(int entity)
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 45.0, 45.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 57.68, 184.56);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(hl2_combine_behavior, "HL2CombineBehavior");

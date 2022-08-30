@@ -9,7 +9,7 @@ static void handle_idle(int entity)
 {
 	if(GetEntPropFloat(entity, Prop_Data, "m_flNextMoanSound") < GetGameTime()) {
 		EmitGameSoundToAll(idle_sounds[GetURandomInt() % sizeof(idle_sounds)], entity);
-		SetEntPropFloat(entity, Prop_Data, "m_flNextMoanSound", GetGameTime() + GetRandomFloat(2.0, 5.0));
+		SetEntPropFloat(entity, Prop_Data, "m_flNextMoanSound", GetGameTime() + GetRandomFloat(10.0, 20.0));
 	}
 }
 

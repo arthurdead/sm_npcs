@@ -16,7 +16,7 @@ static int AE_ANTLION_MELEE_POUNCE = -1;
 
 static int npc_move_yaw = -1;
 
-static int npc_health = 300;
+static ConVar npc_health_cvar;
 
 static void npc_datamap_init(CustomDatamap datamap)
 {
@@ -25,6 +25,8 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_antlion_init()
 {
+	npc_health_cvar = CreateConVar("sk_antlion_health", "1000");
+
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_antlion", "HL2Antlion", _, _, factory));
 	factory.add_alias("npc_hl2_antlion_bosshealthbar");
@@ -54,7 +56,7 @@ static TFClassType npc_pop_class(CustomPopulationSpawner spawner, int num)
 
 static int npc_pop_health(CustomPopulationSpawner spawner, int num)
 {
-	return base_npc_pop_health(spawner, num, npc_health);
+	return base_npc_pop_health(spawner, num, npc_health_cvar.IntValue);
 }
 
 static bool npc_pop_spawn(CustomPopulationSpawner spawner, const float pos[3], ArrayList result)
@@ -200,7 +202,7 @@ static void npc_spawn(int entity)
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health, NULL_VECTOR, 195.0, 354.90);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 195.0, 354.90);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(hl2_antlion_behavior, "HL2AntlionBehavior");
