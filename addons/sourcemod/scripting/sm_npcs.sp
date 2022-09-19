@@ -16,6 +16,8 @@
 #include <expr_pop>
 #include <wpnhack>
 #include <loadsoundscript>
+#include <stocksoup/tf/tempents_stocks>
+#include <teammanager>
 
 TFMonsterResource monster_resource;
 
@@ -28,7 +30,8 @@ ConVar npc_deathnotice_eventtime;
 #include "behavior/range/basic_range.sp"
 #include "behavior/anim/play_anim.sp"
 
-#include "hl2_npcs/hl2_npcs.sp"
+#include "hl2_npcs/npcs.sp"
+#include "mvm_npcs/npcs.sp"
 
 static ConVar nav_authorative;
 static ConVar path_expensive_optimize;
@@ -48,6 +51,7 @@ public void OnPluginStart()
 	play_anim_action_init();
 
 	hl2_npcs_init();
+	mvm_npcs_init();
 
 	nav_authorative = FindConVar("nav_authorative");
 	path_expensive_optimize = FindConVar("path_expensive_optimize");
@@ -87,6 +91,7 @@ public void OnMapStart()
 	int entity = CreateEntityByName("prop_dynamic_override");
 
 	hl2_npcs_precache(entity);
+	mvm_npcs_precache(entity);
 
 	RemoveEntity(entity);
 
@@ -97,6 +102,7 @@ public void OnMapStart()
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	hl2_npcs_entity_created(entity, classname);
+	mvm_npcs_entity_created(entity, classname);
 }
 
 public void OnEntityDestroyed(int entity)
@@ -109,9 +115,11 @@ public void OnEntityDestroyed(int entity)
 	GetEntityClassname(entity, classname, sizeof(classname));
 
 	hl2_npcs_entity_destroyed(entity, classname);
+	mvm_npcs_entity_destroyed(entity, classname);
 }
 
 public void OnPluginEnd()
 {
 	hl2_npcs_plugin_end();
+	mvm_npcs_plugin_end();
 }

@@ -1,8 +1,8 @@
-BehaviorActionEntry basic_melee_action;
+CustomBehaviorActionEntry basic_melee_action;
 
 void basic_melee_action_init()
 {
-	basic_melee_action = new BehaviorActionEntry("BasicMelee");
+	basic_melee_action = new CustomBehaviorActionEntry("BasicMelee");
 	basic_melee_action.set_function("OnStart", action_start);
 	basic_melee_action.set_function("Update", action_update);
 	basic_melee_action.set_function("OnEnd", action_end);
@@ -10,13 +10,13 @@ void basic_melee_action_init()
 	basic_melee_action.set_function("OnKilled", shared_killed);
 }
 
-static void action_end(BehaviorAction action, INextBot bot, int entity, BehaviorAction next)
+static void action_end(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction next)
 {
 	DirectChasePath path = action.get_data("path");
 	delete path;
 }
 
-static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
+static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
 {
 	action.set_data("victim", INVALID_ENT_REFERENCE);
 	action.set_data("victim_time", 0.0);
@@ -33,7 +33,7 @@ static BehaviorResultType action_start(BehaviorAction action, INextBot bot, int 
 	return BEHAVIOR_CONTINUE;
 }
 
-static BehaviorResultType action_update(BehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
+static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
 {
 	int victim = EntRefToEntIndex(action.get_data("victim"));
 	float victim_time = action.get_data("victim_time");

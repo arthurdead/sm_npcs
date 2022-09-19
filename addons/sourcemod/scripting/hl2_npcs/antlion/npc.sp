@@ -25,7 +25,7 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_antlion_init()
 {
-	npc_health_cvar = CreateConVar("sk_antlion_health", "1000");
+	npc_health_cvar = CreateConVar("sk_antlion_health", "300");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_antlion", "HL2Antlion", _, _, factory));

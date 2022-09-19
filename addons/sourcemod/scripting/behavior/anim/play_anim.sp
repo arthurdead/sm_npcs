@@ -1,17 +1,17 @@
-BehaviorActionEntry play_anim_action;
+CustomBehaviorActionEntry play_anim_action;
 
 void play_anim_action_init()
 {
-	play_anim_action = new BehaviorActionEntry("PlayAnim");
+	play_anim_action = new CustomBehaviorActionEntry("PlayAnim");
 	play_anim_action.set_function("OnStart", play_anim_start);
 	play_anim_action.set_function("OnAnimationActivityComplete", play_anim_complete);
 	play_anim_action.set_function("OnAnimationActivityInterrupted", play_anim_interrupted);
 }
 
-static BehaviorResultType play_anim_complete(BehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
+static BehaviorResultType play_anim_complete(CustomBehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
 {
-	BehaviorActionEntry next_entry = action.get_data("next_action_entry");
-	BehaviorAction next_action = next_entry.create();
+	CustomBehaviorActionEntry next_entry = action.get_data("next_action_entry");
+	CustomBehaviorAction next_action = next_entry.create();
 
 	if(action.has_function("setup_next_action")) {
 		Function func = action.get_function("setup_next_action");
@@ -26,13 +26,13 @@ static BehaviorResultType play_anim_complete(BehaviorAction action, INextBot bot
 	return BEHAVIOR_CHANGE_TO;
 }
 
-static BehaviorResultType play_anim_interrupted(BehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
+static BehaviorResultType play_anim_interrupted(CustomBehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
 {
 	result.priority = RESULT_TRY;
 	return BEHAVIOR_CONTINUE;
 }
 
-BehaviorResultType play_anim_start(BehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
+BehaviorResultType play_anim_start(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
 {
 	IBody body = bot.BodyInterface;
 

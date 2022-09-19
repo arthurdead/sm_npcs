@@ -1,5 +1,7 @@
 int hl2_helicopter_muzzle = -1;
 
+ConVar sk_helicopter_dmg;
+
 #include "behavior.sp"
 
 static int npc_idle_anim = -1;
@@ -10,7 +12,9 @@ static ConVar npc_health_cvar;
 
 void hl2_helicopter_init()
 {
-	npc_health_cvar = CreateConVar("sk_helicopter_health", "1000");
+	npc_health_cvar = CreateConVar("sk_helicopter_health", "500");
+
+	sk_helicopter_dmg = CreateConVar("sk_helicopter_dmg", "20");
 
 	CustomEntityFactory factory = null;
 	register_nextbot_factory("npc_hl2_helicopter", "HL2Helicopter", _, _, factory);

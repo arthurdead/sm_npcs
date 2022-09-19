@@ -1,5 +1,7 @@
 int hl2_pistol_muzzle = -1;
 
+ConVar sk_combine_dmg;
+
 #include "behavior.sp"
 
 static int npc_move_yaw = -1;
@@ -13,7 +15,9 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_combine_init()
 {
-	npc_health_cvar = CreateConVar("sk_combine_health", "1000");
+	npc_health_cvar = CreateConVar("sk_combine_health", "125");
+
+	sk_combine_dmg = CreateConVar("sk_combine_dmg", "15");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_combine", "HL2Combine", _, _, factory));

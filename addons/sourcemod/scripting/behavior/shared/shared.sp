@@ -78,11 +78,51 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 		}
 	}
 
+	int my_team = GetEntProp(entity, Prop_Data, "m_iTeamNum");
+	int victim_team = GetEntProp(victim, Prop_Data, "m_iTeamNum");
+
 	Disposition_t disposition = CombatCharacterDisposition(entity, victim);
 	if(bot.IsFriend(victim) ||
-		GetEntProp(entity, Prop_Data, "m_iTeamNum") == GetEntProp(victim, Prop_Data, "m_iTeamNum") ||
+		my_team == victim_team ||
 		disposition == D_LI ||
 		disposition == D_FR) {
+		return false;
+	}
+
+	bool enemy = false;
+
+	switch(my_team) {
+		case 0: {
+			switch(victim_team) {
+				case 2: enemy = true;
+				case 3: enemy = true;
+				case 5: enemy = true;
+			}
+		}
+		case 2: {
+			switch(victim_team) {
+				case 0: enemy = true;
+				case 3: enemy = true;
+				case 5: enemy = true;
+			}
+		}
+		case 3: {
+			switch(victim_team) {
+				case 0: enemy = true;
+				case 2: enemy = true;
+				case 5: enemy = true;
+			}
+		}
+		case 5: {
+			switch(victim_team) {
+				case 0: enemy = true;
+				case 2: enemy = true;
+				case 3: enemy = true;
+			}
+		}
+	}
+
+	if(!enemy) {
 		return false;
 	}
 
@@ -171,7 +211,7 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 	}
 }
 
-BehaviorResultType shared_stuck(BehaviorAction action, INextBot bot, int entity, BehaviorResult result)
+BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int entity, BehaviorResult result)
 {
 	PathFollower path = bot.CurrentPath;
 
@@ -191,7 +231,7 @@ void shared_path_init(PathFollower path)
 	path.MinLookAheadDistance = 300.0;
 }
 
-BehaviorResultType shared_killed(BehaviorAction action, INextBot bot, int entity, const CTakeDamageInfo info, BehaviorResult result)
+BehaviorResultType shared_killed(CustomBehaviorAction action, INextBot bot, int entity, const CTakeDamageInfo info, BehaviorResult result)
 {
 	CombatCharacterEventKilled(entity, info);
 
