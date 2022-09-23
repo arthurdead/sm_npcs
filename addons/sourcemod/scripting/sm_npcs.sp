@@ -32,6 +32,7 @@ ConVar npc_deathnotice_eventtime;
 
 #include "hl2_npcs/npcs.sp"
 #include "mvm_npcs/npcs.sp"
+#include "tf2_npcs/npcs.sp"
 
 static ConVar nav_authorative;
 static ConVar path_expensive_optimize;
@@ -52,6 +53,7 @@ public void OnPluginStart()
 
 	hl2_npcs_init();
 	mvm_npcs_init();
+	tf2_npcs_init();
 
 	nav_authorative = FindConVar("nav_authorative");
 	path_expensive_optimize = FindConVar("path_expensive_optimize");
@@ -92,6 +94,7 @@ public void OnMapStart()
 
 	hl2_npcs_precache(entity);
 	mvm_npcs_precache(entity);
+	tf2_npcs_precache(entity);
 
 	RemoveEntity(entity);
 
@@ -103,6 +106,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 {
 	hl2_npcs_entity_created(entity, classname);
 	mvm_npcs_entity_created(entity, classname);
+	tf2_npcs_entity_created(entity, classname);
 }
 
 public void OnEntityDestroyed(int entity)
@@ -116,10 +120,12 @@ public void OnEntityDestroyed(int entity)
 
 	hl2_npcs_entity_destroyed(entity, classname);
 	mvm_npcs_entity_destroyed(entity, classname);
+	tf2_npcs_entity_destroyed(entity, classname);
 }
 
 public void OnPluginEnd()
 {
 	hl2_npcs_plugin_end();
 	mvm_npcs_plugin_end();
+	tf2_npcs_plugin_end();
 }
