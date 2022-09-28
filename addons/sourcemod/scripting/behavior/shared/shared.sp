@@ -38,7 +38,8 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 	if(victim == 0 ||
 		victim == -1 ||
 		victim == entity ||
-		bot.IsSelf(victim)) {
+		bot.IsSelf(victim) ||
+		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME) {
 		return false;
 	}
 
@@ -58,7 +59,8 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 
 	if(GetEntProp(victim, Prop_Data, "m_takedamage") == DAMAGE_NO ||
 		GetEntProp(victim, Prop_Data, "m_lifeState") != LIFE_ALIVE ||
-		GetEntProp(entity, Prop_Data, "m_iEFlags") & EFL_KILLME) {
+		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME ||
+		GetEntityFlags(victim) & FL_NOTARGET) {
 		return false;
 	}
 
@@ -83,46 +85,9 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 
 	Disposition_t disposition = CombatCharacterDisposition(entity, victim);
 	if(bot.IsFriend(victim) ||
-		my_team == victim_team ||
+		TeamManager_AreTeamsFriends(my_team, victim_team) ||
 		disposition == D_LI ||
 		disposition == D_FR) {
-		return false;
-	}
-
-	bool enemy = false;
-
-	switch(my_team) {
-		case 0: {
-			switch(victim_team) {
-				case 2: enemy = true;
-				case 3: enemy = true;
-				case 5: enemy = true;
-			}
-		}
-		case 2: {
-			switch(victim_team) {
-				case 0: enemy = true;
-				case 3: enemy = true;
-				case 5: enemy = true;
-			}
-		}
-		case 3: {
-			switch(victim_team) {
-				case 0: enemy = true;
-				case 2: enemy = true;
-				case 5: enemy = true;
-			}
-		}
-		case 5: {
-			switch(victim_team) {
-				case 0: enemy = true;
-				case 2: enemy = true;
-				case 3: enemy = true;
-			}
-		}
-	}
-
-	if(!enemy) {
 		return false;
 	}
 
@@ -215,10 +180,35 @@ BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int e
 {
 	PathFollower path = bot.CurrentPath;
 
-	if(path.CurrentGoal != Segment_Null) {
+	Segment goal = path.CurrentGoal;
+	while(goal != Segment_Null) {
 		float pos[3];
-		path.CurrentGoal.GetPosition(pos);
-		TeleportEntity(entity, pos);
+		goal.GetPosition(pos);
+
+		float height = STEP_HEIGHT;
+
+		ILocomotion locomotion = bot.LocomotionInterface;
+		if(locomotion.Type == Locomotion_FlyingCustom) {
+			height = view_as<NextBotFlyingLocomotion>(locomotion).DesiredAltitude;
+		} else {
+			height = locomotion.StepHeight;
+		}
+
+		float mins[3];
+		GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+		float maxs[3];
+		GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+
+		height += -mins[2];
+
+		pos[2] += height;
+
+		if(can_spawn_here(mins, maxs, pos)) {
+			TeleportEntity(entity, pos);
+			break;
+		}
+
+		goal = path.NextSegment(goal);
 	}
 
 	result.priority = RESULT_TRY;
@@ -233,17 +223,21 @@ void shared_path_init(PathFollower path)
 
 BehaviorResultType shared_killed(CustomBehaviorAction action, INextBot bot, int entity, const CTakeDamageInfo info, BehaviorResult result)
 {
-	CombatCharacterEventKilled(entity, info);
-
-	if(AnimatingSelectWeightedSequence(entity, ACT_DIERAGDOLL) == -1) {
-		RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
-	}
-
 	if(action.has_function("handle_die")) {
 		Function func = action.get_function("handle_die");
 		Call_StartFunction(null, func);
 		Call_PushCell(entity);
 		Call_Finish();
+
+		result.set_reason("npc killed");
+		result.priority = RESULT_IMPORTANT;
+		return BEHAVIOR_DONE;
+	}
+
+	CombatCharacterEventKilled(entity, info);
+
+	if(AnimatingSelectWeightedSequence(entity, ACT_DIERAGDOLL) == -1) {
+		RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
 	}
 
 	result.set_reason("npc killed");

@@ -19,7 +19,9 @@ void tf2_npcs_entity_created(int entity, const char[] classname)
 
 void tf2_npcs_entity_destroyed(int entity, const char[] classname)
 {
-	
+	if(StrContains(classname, "npc_tf2_saucer") != -1) {
+		tf2_saucer_destroyed(entity);
+	}
 }
 
 void tf2_npcs_plugin_end()

@@ -6,7 +6,7 @@ static ConVar npc_health_cvar;
 
 static void npc_datamap_init(CustomDatamap datamap)
 {
-	
+	datamap.add_prop("m_hIdleSoundTimer", custom_prop_int);
 }
 
 void tf2_saucer_init()
@@ -30,7 +30,7 @@ void tf2_saucer_init()
 
 static bool npc_pop_classicon(CustomPopulationSpawner spawner, int num, char[] str, int len)
 {
-	strcopy(str, len, "saucer");
+	strcopy(str, len, "saucer_lite");
 	return true;
 }
 
@@ -49,17 +49,23 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 	return npc_pop_spawn_single("npc_tf2_saucer", spawner, pos, result);
 }
 
-#define TF2_SAUCER_MODEL "models/props_invader/saucer.mdl"
+#define TF2_SAUCER_MODEL "models/props_teaser/saucer.mdl"
 
 void tf2_saucer_precache(int entity)
 {
 	PrecacheModel(TF2_SAUCER_MODEL);
 
-	AddModelToDownloadsTable(TF2_SAUCER_MODEL);
+	//AddModelToDownloadsTable(TF2_SAUCER_MODEL);
 
 	SetEntityModel(entity, TF2_SAUCER_MODEL);
 
-	npc_idle_anim = AnimatingLookupSequence(entity, "saucer_loop");
+	npc_idle_anim = AnimatingLookupSequence(entity, "idle");
+
+	PrecacheScriptSound("Weapon_Capper.Single");
+
+	PrecacheSound("UFO_1_short.wav");
+	PrecacheSound("e_o_mvm.wav");
+	PrecacheSound("e_o_mvm_2.wav");
 }
 
 void tf2_saucer_created(int entity)
@@ -97,6 +103,8 @@ static Action npc_think(int entity)
 
 	//handle_playbackrate(entity, locomotion, body);
 
+	SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 2.0);
+
 	fire_animevents(entity);
 
 	return Plugin_Continue;
@@ -126,19 +134,19 @@ static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 
 static void npc_spawn(int entity)
 {
-	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 0.5);
+	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 2.0);
 	SetEntityModel(entity, TF2_SAUCER_MODEL);
-	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_MECH);
+	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_GREEN);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Saucer");
 
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({38.0, 38.0, 38.0}), 200.0, 500.0);
+	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 135.0, 500.0);
 	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
-	//custom_locomotion.AllowFacing = false;
+	custom_locomotion.AllowFacing = false;
 
 	bot.AllocateCustomIntention(tf2_saucer_behavior, "TF2SaucerBehavior");
 
@@ -147,4 +155,28 @@ static void npc_spawn(int entity)
 	body_custom.set_function("TranslateActivity", npc_translate_act);
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
+
+	EmitSoundToAll("e_o_mvm_2.wav", entity, SNDCHAN_BODY, SNDLEVEL_AIRCRAFT);
+	SetEntProp(entity, Prop_Data, "m_hIdleSoundTimer", CreateTimer(1.0, timer_npc_idlesound, EntIndexToEntRef(entity), TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE));
+}
+
+static Action timer_npc_idlesound(Handle timer, int entity)
+{
+	entity = EntRefToEntIndex(entity);
+	if(entity == -1) {
+		return Plugin_Stop;
+	}
+
+	EmitSoundToAll("e_o_mvm_2.wav", entity, SNDCHAN_BODY, SNDLEVEL_AIRCRAFT);
+	return Plugin_Continue;
+}
+
+void tf2_saucer_destroyed(int entity)
+{
+	Handle timer = GetEntProp(entity, Prop_Data, "m_hIdleSoundTimer");
+	if(timer != null) {
+		KillTimer(timer);
+	}
+
+	StopSound(entity, SNDCHAN_BODY, "e_o_mvm_2.wav");
 }

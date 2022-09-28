@@ -17,11 +17,14 @@
 #include <wpnhack>
 #include <loadsoundscript>
 #include <stocksoup/tf/tempents_stocks>
+#include <rulestools>
 #include <teammanager>
 
 TFMonsterResource monster_resource;
 
 ConVar npc_deathnotice_eventtime;
+
+int ParticleEffectNames = INVALID_STRING_TABLE;
 
 #include "sm_npcs_shared.sp"
 
@@ -33,9 +36,11 @@ ConVar npc_deathnotice_eventtime;
 #include "hl2_npcs/npcs.sp"
 #include "mvm_npcs/npcs.sp"
 #include "tf2_npcs/npcs.sp"
+#include "tf2i_npcs/npcs.sp"
 
 static ConVar nav_authorative;
 static ConVar path_expensive_optimize;
+static ConVar tf_npc_flying_algo;
 
 static bool late_load;
 
@@ -54,9 +59,11 @@ public void OnPluginStart()
 	hl2_npcs_init();
 	mvm_npcs_init();
 	tf2_npcs_init();
+	tf2i_npcs_init();
 
 	nav_authorative = FindConVar("nav_authorative");
 	path_expensive_optimize = FindConVar("path_expensive_optimize");
+	tf_npc_flying_algo = FindConVar("tf_npc_flying_algo");
 
 	npc_deathnotice_eventtime = FindConVar("npc_deathnotice_eventtime");
 
@@ -81,6 +88,7 @@ public void OnConfigsExecuted()
 {
 	nav_authorative.BoolValue = false;
 	path_expensive_optimize.BoolValue = true;
+	//tf_npc_flying_algo.IntValue = 3;
 
 	FindConVar("ai_show_hull_attacks").BoolValue = true;
 
@@ -90,11 +98,14 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
+	ParticleEffectNames = FindStringTable("ParticleEffectNames");
+
 	int entity = CreateEntityByName("prop_dynamic_override");
 
 	hl2_npcs_precache(entity);
 	mvm_npcs_precache(entity);
 	tf2_npcs_precache(entity);
+	tf2i_npcs_precache(entity);
 
 	RemoveEntity(entity);
 
@@ -107,6 +118,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 	hl2_npcs_entity_created(entity, classname);
 	mvm_npcs_entity_created(entity, classname);
 	tf2_npcs_entity_created(entity, classname);
+	tf2i_npcs_entity_created(entity, classname);
 }
 
 public void OnEntityDestroyed(int entity)
@@ -121,6 +133,7 @@ public void OnEntityDestroyed(int entity)
 	hl2_npcs_entity_destroyed(entity, classname);
 	mvm_npcs_entity_destroyed(entity, classname);
 	tf2_npcs_entity_destroyed(entity, classname);
+	tf2i_npcs_entity_destroyed(entity, classname);
 }
 
 public void OnPluginEnd()
@@ -128,4 +141,5 @@ public void OnPluginEnd()
 	hl2_npcs_plugin_end();
 	mvm_npcs_plugin_end();
 	tf2_npcs_plugin_end();
+	tf2i_npcs_plugin_end();
 }

@@ -71,6 +71,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	ArousalType arousal = NEUTRAL;
 
 	bool sight_clear = false;
+	float sight_pos[3];
 
 	shared_handle_speed(entity, bot, locomotion, body, victim);
 
@@ -79,7 +80,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	PathFollower path = action.get_data("path");
 
 	if(victim != -1) {
-		sight_clear = vision.IsLineOfSightClearToEntity(victim);
+		sight_clear = vision.IsLineOfSightClearToEntity(victim, sight_pos);
 
 		arousal = ALERT;
 
@@ -110,6 +111,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 				Call_PushCell(action);
 				Call_PushCell(entity);
 				Call_PushCell(victim);
+				Call_PushArray(sight_pos, 3);
 				Call_Finish();
 			}
 
@@ -135,7 +137,6 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 		if(!action.get_data("stopped")) {
 			stopped_pos = feet;
 			action.set_data_array("stopped_pos", feet, 3);
-			PrintToServer("stopped");
 			action.set_data("stopped", true);
 			just_stopped = true;
 		}
@@ -173,7 +174,6 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 				delete tmp_areas;
 			}
 
-			PrintToServer("calculated stopped areas");
 			action.set_data("stopped_areas", stopped_areas);
 		}
 
@@ -190,7 +190,6 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 				stopped_area_pos_change_time = 0.0;
 				path.Invalidate();
 			}
-			PrintToServer("got random area");
 			action.set_data("stopped_area_change_time", GetGameTime() + 5.0);
 		}
 
@@ -202,9 +201,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 				stopped_area.GetRandomPoint(stopped_area_pos);
 				action.set_data_array("stopped_area_pos", stopped_area_pos, 3);
 				path.ComputeVector(bot, stopped_area_pos, baseline_path_cost, cost_flags_safest|cost_flags_mod_small);
-				PrintToServer("path to %f, %f, %f", stopped_area_pos[0], stopped_area_pos[1], stopped_area_pos[2]);
 			}
-			PrintToServer("got random area pos");
 			action.set_data("stopped_area_pos_change_time", GetGameTime() + 0.5);
 		}
 

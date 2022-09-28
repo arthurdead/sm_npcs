@@ -112,7 +112,83 @@ stock int get_player_count()
 	return players;
 }
 
-stock int create_bonemerge_model(int owner, const char[] model, const char[] attach)
+stock int find_particle(const char[] name)
+{
+	if(ParticleEffectNames == INVALID_STRING_TABLE) {
+		ParticleEffectNames = FindStringTable("ParticleEffectNames");
+	}
+	return FindStringIndex(ParticleEffectNames, name);
+}
+
+stock void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float offset[3])
+{
+	float vecForward[3];
+	float vecLeft[3];
+	float vecUp[3];
+	GetAngleVectors(angle, vecForward, vecLeft, vecUp);
+
+	ScaleVector(vecForward, offset[0]);
+	ScaleVector(vecLeft, offset[1]);
+	ScaleVector(vecUp, offset[2]);
+
+	float vecAdd[3];
+	AddVectors(vecAdd, vecForward, vecAdd);
+	AddVectors(vecAdd, vecLeft, vecAdd);
+	AddVectors(vecAdd, vecUp, vecAdd);
+
+	AddVectors(buffer, vecAdd, buffer);
+}
+
+stock void setup_tracer(int weapon, int particle, float start[3], float ang[3], float end[3])
+{
+	TE_Start("TFParticleEffect");
+	TE_WriteNum("entindex", weapon);
+	TE_WriteNum("m_iParticleSystemIndex", particle);
+
+	TE_WriteNum("m_iAttachType", view_as<int>(PATTACH_CUSTOMORIGIN));
+	TE_WriteFloat("m_vecOrigin[0]", start[0]);
+	TE_WriteFloat("m_vecOrigin[1]", start[1]);
+	TE_WriteFloat("m_vecOrigin[2]", start[2]);
+
+	if(!IsNullVector(ang)) {
+		TE_WriteVector("m_vecAngles", ang);
+	}
+
+	TE_WriteNum("m_bControlPoint1", 1);
+	TE_WriteNum("m_ControlPoint1.m_eParticleAttachment", view_as<int>(PATTACH_WORLDORIGIN));
+
+	float actual_end[3];
+	if(IsNullVector(end)) {
+		float trace_end[3];
+		trace_end[0] = start[0];
+		trace_end[1] = start[1];
+		trace_end[2] = start[2];
+
+		float trace_ang[3];
+		if(!IsNullVector(ang)) {
+			trace_ang[0] = ang[0];
+			trace_ang[1] = ang[1];
+			trace_ang[2] = ang[2];
+		} else {
+			GetEntPropVector(weapon, Prop_Send, "m_angRotation", trace_ang);
+		}
+
+		VectorAddRotatedOffset(trace_ang, trace_end, view_as<float>({8192.0, 0.0, 0.0}));
+
+		TR_TraceRayFilter(start, trace_end, MASK_SOLID, RayType_EndPoint, trace_filter_entity, weapon);
+		TR_GetEndPosition(actual_end);
+	} else {
+		actual_end[0] = end[0];
+		actual_end[1] = end[1];
+		actual_end[2] = end[2];
+	}
+
+	TE_WriteFloat("m_ControlPoint1.m_vecOffset[0]", actual_end[0]);
+	TE_WriteFloat("m_ControlPoint1.m_vecOffset[1]", actual_end[1]);
+	TE_WriteFloat("m_ControlPoint1.m_vecOffset[2]", actual_end[2]);
+}
+
+stock int create_attach_model(int owner, const char[] model, const char[] attach)
 {
 	int merge = CreateEntityByName("prop_dynamic_override");
 	DispatchKeyValue(merge, "model", model);
@@ -121,10 +197,19 @@ stock int create_bonemerge_model(int owner, const char[] model, const char[] att
 	SetVariantString("!activator");
 	AcceptEntityInput(merge, "SetParent", owner);
 	int effects = GetEntProp(merge, Prop_Send, "m_fEffects");
-	effects |= EF_BONEMERGE|EF_BONEMERGE_FASTCULL|EF_PARENT_ANIMATES;
+	effects |= EF_PARENT_ANIMATES;
 	SetEntProp(merge, Prop_Send, "m_fEffects", effects);
 	SetVariantString(attach)
 	AcceptEntityInput(merge, "SetParentAttachment");
+	return merge;
+}
+
+stock int create_bonemerge_model(int owner, const char[] model, const char[] attach)
+{
+	int merge = create_attach_model(owner, model, attach);
+	int effects = GetEntProp(merge, Prop_Send, "m_fEffects");
+	effects |= EF_BONEMERGE|EF_BONEMERGE_FASTCULL|EF_PARENT_ANIMATES;
+	SetEntProp(merge, Prop_Send, "m_fEffects", effects);
 	return merge;
 }
 
@@ -161,9 +246,9 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 {
 	AnyLocomotion custom_locomotion = bot.AllocateLocomotion(fly);
 	if(fly) {
-		custom_locomotion.MaxJumpHeight = walk_speed;
+		custom_locomotion.MaxJumpHeight = 0.0;
 		custom_locomotion.DeathDropHeight = 9999999.0;
-		custom_locomotion.StepHeight = walk_speed;
+		custom_locomotion.StepHeight = STEP_HEIGHT;
 		custom_locomotion.WalkSpeed = run_speed;
 		custom_locomotion.RunSpeed = run_speed;
 		custom_locomotion.DesiredAltitude = walk_speed;
@@ -190,7 +275,7 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 
 	int initialteam = GetEntProp(entity, Prop_Data, "m_iInitialTeamNum");
 	if(initialteam == TEAM_UNASSIGNED) {
-		if(GameRules_GetProp("m_bPlayingMannVsMachine")) {
+		if(IsMannVsMachineMode()) {
 			SetEntProp(entity, Prop_Send, "m_iTeamNum", TF_TEAM_PVE_INVADERS);
 		} else {
 			SetEntProp(entity, Prop_Send, "m_iTeamNum", TF_TEAM_HALLOWEEN);
@@ -199,7 +284,8 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 		SetEntProp(entity, Prop_Send, "m_iTeamNum", initialteam);
 	}
 
-	if(GetEntProp(entity, Prop_Send, "m_iTeamNum") == TF_TEAM_PVE_INVADERS && GameRules_GetProp("m_bPlayingMannVsMachine")) {
+	int team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
+	if((team == TF_TEAM_PVE_INVADERS || team == TF_TEAM_PVE_INVADERS_GIANTS) && IsMannVsMachineMode()) {
 		//TODO!!!!! move this elsewhere
 		custom_locomotion.set_function("ShouldCollideWith", npc_loc_collide);
 	}
@@ -211,7 +297,15 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 	if(idx != -1) {
 		classname[idx] = '\0';
 
-		SetEntProp(entity, Prop_Send, "m_eType", 2);
+		//2 == -35.0
+		//1 == -30.0
+		//0 == -10.0
+
+		if(fly) {
+			SetEntProp(entity, Prop_Send, "m_eType", 0);
+		} else {
+			SetEntProp(entity, Prop_Send, "m_eType", 2);
+		}
 	} else {
 		idx = StrContains(classname, "_tankhealthbar");
 		if(idx != -1) {
@@ -277,6 +371,12 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 	}
 
 	return true;
+}
+
+stock bool can_spawn_here(const float mins[3], float maxs[3], const float pos[3])
+{
+	TR_TraceHull(pos, pos, mins, maxs, MASK_NPCSOLID);
+	return TR_GetFraction() >= 0.8;
 }
 
 stock bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner spawner, const float pos[3], ArrayList result)
@@ -362,14 +462,8 @@ void set_npc_hull(IBodyCustom body_custom, int entity, const float hull[3])
 		SetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
 	}
 
-	float width = 0.0;
-	if(-mins[1] > maxs[1]) {
-		width = -mins[1];
-	} else {
-		width = maxs[1];
-	}
-
-	float height = maxs[2];
+	float width = maxs[1] - mins[1];
+	float height = maxs[2] - mins[2];
 
 	#define TF2_MAGIC_HULL_HEIGHT 135.0
 
@@ -648,7 +742,7 @@ stock void handle_move_yaw(int entity, int pose, ILocomotion locomotion)
 
 stock void npc_hull_debug(INextBot bot, IBody body, ILocomotion locomotion, int entity)
 {
-	if(bot.IsDebugging(NEXTBOT_LOCOMOTION)) {
+	if(bot.IsDebugging(NEXTBOT_LOCOMOTION) && 0) {
 		float pos[3];
 		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
 
