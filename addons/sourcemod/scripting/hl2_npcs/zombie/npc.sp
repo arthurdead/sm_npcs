@@ -27,10 +27,10 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_zombie_init()
 {
-	npc_health_cvar = CreateConVar("sk_zombie_health", "125");
+	npc_health_cvar = CreateConVar("sk_zombie_health", "200");
 
-	sk_zombie_dmg_one_slash = CreateConVar("sk_zombie_dmg_one_slash", "10");
-	sk_zombie_dmg_both_slash = CreateConVar("sk_zombie_dmg_both_slash", "25");
+	sk_zombie_dmg_one_slash = CreateConVar("sk_zombie_dmg_one_slash", "20");
+	sk_zombie_dmg_both_slash = CreateConVar("sk_zombie_dmg_both_slash", "35");
 
 	zombie_moanfreq = CreateConVar("zombie_moanfreq", "4");
 

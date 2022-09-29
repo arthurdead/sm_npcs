@@ -15,9 +15,9 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_combine_init()
 {
-	npc_health_cvar = CreateConVar("sk_combine_health", "125");
+	npc_health_cvar = CreateConVar("sk_combine_health", "250");
 
-	sk_combine_dmg = CreateConVar("sk_combine_dmg", "15");
+	sk_combine_dmg = CreateConVar("sk_combine_dmg", "20");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_combine", "HL2Combine", _, _, factory));

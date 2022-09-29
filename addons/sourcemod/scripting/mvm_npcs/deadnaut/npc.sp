@@ -60,7 +60,7 @@ void mvm_deadnaut_precache(int entity)
 {
 	PrecacheModel("models/deadnaut/deadnaut_heavy_anim.mdl");
 
-	AddModelToDownloadsTable("models/deadnaut/deadnaut_heavy_anim.mdl");
+	//AddModelToDownloadsTable("models/deadnaut/deadnaut_heavy_anim.mdl");
 
 	SetEntityModel(entity, "models/deadnaut/deadnaut_heavy_anim.mdl");
 

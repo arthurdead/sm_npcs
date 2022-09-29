@@ -19,7 +19,7 @@ void tf2i_alien_commando_init()
 {
 	npc_health_cvar = CreateConVar("sk_tf2i_alien_health", "125");
 
-	sk_tf2i_alien_commando_dmg = CreateConVar("sk_tf2i_alien_commando_dmg", "15");
+	sk_tf2i_alien_commando_dmg = CreateConVar("sk_tf2i_alien_commando_dmg", "50");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_tf2i_alien_commando", "TF2IAlienCommando", _, _, factory));
@@ -63,6 +63,8 @@ void tf2i_alien_commando_precache(int entity)
 {
 	PrecacheModel(TF2I_ALIEN_COMMANDO_MODEL);
 	SetEntityModel(entity, TF2I_ALIEN_COMMANDO_MODEL);
+
+	AddModelToDownloadsTable(TF2I_ALIEN_COMMANDO_MODEL);
 
 	npc_move_yaw = AnimatingLookupPoseParameter(entity, "move_yaw");
 

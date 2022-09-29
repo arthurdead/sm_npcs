@@ -14,7 +14,7 @@ static void handle_fire(CustomBehaviorAction action, int entity, int victim, con
 		bullets.m_pAttacker = entity;
 		bullets.m_iTracerFreq = 1;
 
-		bullets.m_flDamage = 0.0;
+		bullets.m_flDamage = 20.0;
 		bullets.m_iPlayerDamage = RoundToFloor(bullets.m_flDamage);
 
 		strcopy(bullets.tracer_name, MAX_TRACER_NAME, "merasmus_zap");

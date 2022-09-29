@@ -13,12 +13,11 @@ static void handle_fire(CustomBehaviorAction action, int entity, int victim, con
 		float muzzle_ang[3];
 		AnimatingGetAttachment(weapon, hl2_pistol_muzzle, bullets.m_vecSrc, muzzle_ang);
 
-		GetAngleVectors(muzzle_ang, bullets.m_vecDirShooting, NULL_VECTOR, NULL_VECTOR);
+		SubtractVectors(sight_pos, bullets.m_vecSrc, bullets.m_vecDirShooting);
 
-		bullets.m_vecSpread = view_as<float>({24.0, 24.0, 24.0});
+		bullets.m_vecSpread = view_as<float>({0.0, 0.0, 0.0});
 		bullets.m_nFlags |= FIRE_BULLETS_TEMPORARY_DANGER_SOUND;
 		bullets.m_pAttacker = entity;
-		bullets.m_flDistance = GetVectorLength(bullets.m_vecDirShooting) + 100.0;
 		bullets.m_iTracerFreq = 1;
 
 		bullets.m_flDamage = sk_combine_dmg.FloatValue;

@@ -9,7 +9,7 @@
 #define EF_BONEMERGE_FASTCULL 0x080
 #define EF_PARENT_ANIMATES 0x200
 
-#define MELEE_RANGE 55.0
+#define MELEE_RANGE 70.0
 float MELEE_MINS[3] = {-24.0, -24.0, -82.0};
 float MELEE_MAXS[3] = {24.0, 24.0, 82.0};
 

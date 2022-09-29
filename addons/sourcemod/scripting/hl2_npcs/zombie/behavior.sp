@@ -27,7 +27,7 @@ BehaviorAction hl2_zombie_behavior(int entity)
 {
 	CustomBehaviorAction action = basic_melee_action.create();
 	action.set_function("handle_idle", handle_idle);
-	action.set_function("handle_die", handle_die);
+	//action.set_function("handle_die", handle_die);
 	action.set_function("handle_swing", handle_swing);
 	return action;
 }

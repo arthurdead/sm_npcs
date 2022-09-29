@@ -12,7 +12,7 @@ static ConVar npc_health_cvar;
 
 void hl2_helicopter_init()
 {
-	npc_health_cvar = CreateConVar("sk_helicopter_health", "500");
+	npc_health_cvar = CreateConVar("sk_helicopter_health", "5000");
 
 	sk_helicopter_dmg = CreateConVar("sk_helicopter_dmg", "20");
 

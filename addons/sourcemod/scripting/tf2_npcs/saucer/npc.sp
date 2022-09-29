@@ -11,7 +11,7 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void tf2_saucer_init()
 {
-	npc_health_cvar = CreateConVar("tf_saucer_health", "125");
+	npc_health_cvar = CreateConVar("tf_saucer_health", "1000");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_tf2_saucer", "TF2Saucer", _, _, factory));

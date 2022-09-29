@@ -25,7 +25,7 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void hl2_antlion_init()
 {
-	npc_health_cvar = CreateConVar("sk_antlion_health", "300");
+	npc_health_cvar = CreateConVar("sk_antlion_health", "150");
 
 	CustomEntityFactory factory = null;
 	npc_datamap_init(register_nextbot_factory("npc_hl2_antlion", "HL2Antlion", _, _, factory));
@@ -139,7 +139,7 @@ static Action npc_handle_animevent(int entity, animevent_t event)
 	} else if(event.event == AE_ANTLION_MELEE_HIT1 ||
 		event.event == AE_ANTLION_MELEE_HIT2 ||
 		event.event == AE_ANTLION_MELEE_POUNCE) {
-		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 10, DMG_SLASH|DMG_CLUB, 1.0, true);
+		int hit = CombatCharacterHullAttackRange(entity, MELEE_RANGE, MELEE_MINS, MELEE_MAXS, 70, DMG_SLASH|DMG_CLUB, 1.0, true);
 		if(hit != -1) {
 			EmitGameSoundToAll("NPC_Antlion.MeleeAttack", entity);
 		}
