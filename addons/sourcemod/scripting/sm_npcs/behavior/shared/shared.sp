@@ -127,7 +127,9 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 	int new_victim = -1;
 
 	for(int i = 1; i <= MaxClients; ++i) {
-		if(!IsClientInGame(i)) {
+		if(!IsClientInGame(i) ||
+			IsClientSourceTV(i) ||
+			IsClientReplay(i)) {
 			continue;
 		}
 
@@ -223,15 +225,19 @@ void shared_path_init(PathFollower path)
 
 BehaviorResultType shared_killed(CustomBehaviorAction action, INextBot bot, int entity, const CTakeDamageInfo info, BehaviorResult result)
 {
-	if(action.has_function("handle_die")) {
-		Function func = action.get_function("handle_die");
-		Call_StartFunction(null, func);
+	Handle pl;
+	Function func = action.get_function("handle_die", pl);
+	if(func != INVALID_FUNCTION && pl != null) {
+		Call_StartFunction(pl, func);
 		Call_PushCell(entity);
-		Call_Finish();
+		bool res = true;
+		Call_Finish(res);
 
-		result.set_reason("npc killed");
-		result.priority = RESULT_IMPORTANT;
-		return BEHAVIOR_DONE;
+		if(!res) {
+			result.set_reason("npc killed");
+			result.priority = RESULT_IMPORTANT;
+			return BEHAVIOR_DONE;
+		}
 	}
 
 	CombatCharacterEventKilled(entity, info);

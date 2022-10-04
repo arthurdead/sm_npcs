@@ -10,12 +10,14 @@ static void handle_fire(CustomBehaviorAction action, int entity, int victim, con
 		FireBulletsInfo_t bullets;
 		bullets.Init();
 
+		int attachment = tf2_cow_mangler_muzzle;
+
 		float muzzle_ang[3];
-		AnimatingGetAttachment(weapon, tf2_shooting_star_muzzle, bullets.m_vecSrc, muzzle_ang);
+		AnimatingGetAttachment(weapon, attachment, bullets.m_vecSrc, muzzle_ang);
 
 		SubtractVectors(sight_pos, bullets.m_vecSrc, bullets.m_vecDirShooting);
 
-		bullets.m_vecSpread = view_as<float>({0.0, 0.0, 0.0});
+		bullets.m_vecSpread = view_as<float>({50.0, 0.0, 0.0});
 		bullets.m_nFlags |= FIRE_BULLETS_TEMPORARY_DANGER_SOUND;
 		bullets.m_pAttacker = entity;
 		bullets.m_iTracerFreq = 1;
@@ -24,7 +26,7 @@ static void handle_fire(CustomBehaviorAction action, int entity, int victim, con
 		bullets.m_iPlayerDamage = RoundToFloor(bullets.m_flDamage);
 
 		strcopy(bullets.tracer_name, MAX_TRACER_NAME, "dxhr_sniper_rail_blue");
-		bullets.attachment = tf2_shooting_star_muzzle;
+		bullets.attachment = attachment;
 		bullets.forced_tracer_type = TRACER_PARTICLE;
 
 		FireBullets(weapon, bullets);
@@ -35,9 +37,15 @@ static void handle_fire(CustomBehaviorAction action, int entity, int victim, con
 	}
 }
 
-static void handle_die(int entity)
+static bool handle_die(int entity)
 {
-	RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
+	int weapon = GetEntPropEnt(entity, Prop_Data, "m_hWeaponModel");
+	if(weapon != -1) {
+		RemoveEntity(weapon);
+		SetEntPropEnt(entity, Prop_Data, "m_hWeaponModel", -1);
+	}
+
+	return true;
 }
 
 BehaviorAction tf2i_alien_commando_behavior(int entity)

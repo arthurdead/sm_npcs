@@ -63,7 +63,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	}
 
 	IBody body = bot.BodyInterface;
-	IBodyCustom body_custom = view_as<IBodyCustom>(body);
+	//IBodyCustom body_custom = view_as<IBodyCustom>(body);
 	ILocomotion locomotion = bot.LocomotionInterface;
 
 	float chase_range = RANGED_RANGE - 5.0;
@@ -105,9 +105,10 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 		}
 
 		if(sight_clear) {
-			if(action.has_function("handle_fire")) {
-				Function func = action.get_function("handle_fire");
-				Call_StartFunction(null, func);
+			Handle pl;
+			Function func = action.get_function("handle_fire", pl);
+			if(func != INVALID_FUNCTION && pl != null) {
+				Call_StartFunction(pl, func);
 				Call_PushCell(action);
 				Call_PushCell(entity);
 				Call_PushCell(victim);
@@ -121,7 +122,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 
 	shared_handle_anim(locomotion, body, sight_clear, victim);
 
-	float ground_speed = locomotion.GroundSpeed;
+	//float ground_speed = locomotion.GroundSpeed;
 
 	if(!pathing) {
 		float feet[3];

@@ -133,9 +133,10 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 									action.set_data("swing_time", swing_time);
 									action.set_data("attack_time", swing_time);
 
-									if(action.has_function("handle_swing")) {
-										Function func = action.get_function("handle_swing");
-										Call_StartFunction(null, func);
+									Handle pl;
+									Function func = action.get_function("handle_swing", pl);
+									if(func != INVALID_FUNCTION && pl != null) {
+										Call_StartFunction(pl, func);
 										Call_PushCell(entity);
 										Call_Finish();
 									}
@@ -156,9 +157,10 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	if(swing_time < GetGameTime()) {
 		shared_handle_anim(locomotion, body, sight_clear, victim);
 
-		if(action.has_function("handle_idle")) {
-			Function func = action.get_function("handle_idle");
-			Call_StartFunction(null, func);
+		Handle pl;
+		Function func = action.get_function("handle_idle", pl);
+		if(func != INVALID_FUNCTION && pl != null) {
+			Call_StartFunction(pl, func);
 			Call_PushCell(entity);
 			Call_Finish();
 		}

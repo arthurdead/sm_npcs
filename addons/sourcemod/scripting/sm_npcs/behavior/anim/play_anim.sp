@@ -13,9 +13,10 @@ static BehaviorResultType play_anim_complete(CustomBehaviorAction action, INextB
 	CustomBehaviorActionEntry next_entry = action.get_data("next_action_entry");
 	CustomBehaviorAction next_action = next_entry.create();
 
-	if(action.has_function("setup_next_action")) {
-		Function func = action.get_function("setup_next_action");
-		Call_StartFunction(null, func);
+	Handle pl;
+	Function func = action.get_function("setup_next_action", pl);
+	if(func != INVALID_FUNCTION && pl != null) {
+		Call_StartFunction(pl, func);
 		Call_PushCell(next_action);
 		Call_Finish();
 	}

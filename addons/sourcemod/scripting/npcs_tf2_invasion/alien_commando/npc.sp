@@ -1,6 +1,5 @@
 int tf2_shooting_star_muzzle = -1;
-int dxhr_sniper_rail_red = INVALID_STRING_INDEX;
-int dxhr_sniper_rail_blue = INVALID_STRING_INDEX;
+int tf2_cow_mangler_muzzle = -1;
 
 ConVar sk_tf2i_alien_commando_dmg;
 
@@ -18,14 +17,9 @@ static void npc_datamap_init(CustomDatamap datamap)
 void tf2i_alien_commando_init()
 {
 	npc_health_cvar = CreateConVar("sk_tf2i_alien_health", "125");
-
 	sk_tf2i_alien_commando_dmg = CreateConVar("sk_tf2i_alien_commando_dmg", "50");
 
-	CustomEntityFactory factory = null;
-	npc_datamap_init(register_nextbot_factory("npc_tf2i_alien_commando", "TF2IAlienCommando", _, _, factory));
-
-	npc_datamap_init(register_robot_nextbot_factory("npc_tf2i_alien_commando_robothealthbar", "TF2IAlienCommando"));
-	npc_datamap_init(register_tankboss_nextbot_factory("npc_tf2i_alien_commando_tankhealthbar", "TF2IAlienCommando"));
+	create_npc_factories("npc_tf2i_alien_commando", "TF2IAlienCommando", npc_datamap_init);
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("TF2IAlienCommando");
 	spawner.Parse = base_npc_pop_parse;
@@ -57,14 +51,12 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 	return npc_pop_spawn_single("npc_tf2i_alien_commando", spawner, pos, result);
 }
 
-#define TF2I_ALIEN_COMMANDO_MODEL "models/player/alien_commando.mdl"
-
 void tf2i_alien_commando_precache(int entity)
 {
-	PrecacheModel(TF2I_ALIEN_COMMANDO_MODEL);
-	SetEntityModel(entity, TF2I_ALIEN_COMMANDO_MODEL);
+	PrecacheModel("models/tf2_invasion/alien_commando_v2.mdl");
+	AddModelToDownloadsTable("models/tf2_invasion/alien_commando_v2.mdl");
 
-	AddModelToDownloadsTable(TF2I_ALIEN_COMMANDO_MODEL);
+	SetEntityModel(entity, "models/tf2_invasion/alien_commando_v2.mdl");
 
 	npc_move_yaw = AnimatingLookupPoseParameter(entity, "move_yaw");
 
@@ -73,8 +65,10 @@ void tf2i_alien_commando_precache(int entity)
 
 	tf2_shooting_star_muzzle = AnimatingLookupAttachment(entity, "muzzle");
 
-	dxhr_sniper_rail_red = find_particle("dxhr_sniper_rail_red");
-	dxhr_sniper_rail_blue = find_particle("dxhr_sniper_rail_blue");
+	PrecacheModel("models/workshop/weapons/c_models/c_drg_cowmangler/c_drg_cowmangler.mdl");
+	SetEntityModel(entity, "models/workshop/weapons/c_models/c_drg_cowmangler/c_drg_cowmangler.mdl");
+
+	tf2_cow_mangler_muzzle = AnimatingLookupAttachment(entity, "muzzle");
 
 	PrecacheScriptSound("Weapon_ShootingStar.SingleCharged");
 }
@@ -90,7 +84,7 @@ static Action npc_think(int entity)
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
 
-	npc_hull_debug(bot, body, locomotion, entity);
+	//npc_hull_debug(bot, body, locomotion, entity);
 
 	npc_resolve_collisions(entity);
 
@@ -143,10 +137,6 @@ static Activity npc_translate_act(IBodyCustom body, Activity act)
 		case ACT_WALK_RELAXED: {
 			return ACT_RUN;
 		}
-
-		case ACT_RANGE_ATTACK1: {
-			return ACT_RANGE_ATTACK_PISTOL;
-		}
 	}
 
 	return act;
@@ -159,14 +149,17 @@ static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 
 static void npc_spawn(int entity)
 {
-	SetEntityModel(entity, TF2I_ALIEN_COMMANDO_MODEL);
+	SetEntityModel(entity, "models/tf2_invasion/alien_commando_v2.mdl");
 	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_GREEN);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Alien Commando");
+
+	SetEntProp(entity, Prop_Send, "m_nSkin", GetURandomInt() % 3);
+	SetEntProp(entity, Prop_Send, "m_nBody", GetURandomInt() % 2);
 
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 175.0, 175.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 24.0, 72.0}), 175.0, 175.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(tf2i_alien_commando_behavior, "TF2IAlienCommandoBehavior");
@@ -176,9 +169,17 @@ static void npc_spawn(int entity)
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 
-	int weapon = create_attach_model(entity, "models/workshop/weapons/c_models/c_invasion_sniperrifle/c_invasion_sniperrifle.mdl", "0");
+	int weapon = create_attach_model(entity, "models/workshop/weapons/c_models/c_drg_cowmangler/c_drg_cowmangler.mdl", "0");
 	SetEntPropVector(weapon, Prop_Send, "m_angRotation", view_as<float>({-90.0, -90.0, 0.0}));
 	SetEntPropVector(weapon, Prop_Send, "m_vecOrigin", view_as<float>({0.0, 0.0, 20.0}));
 	SetEntProp(weapon, Prop_Send, "m_nSkin", 1);
 	SetEntPropEnt(entity, Prop_Data, "m_hWeaponModel", weapon);
+}
+
+void tf2i_alien_commando_destroyed(int entity)
+{
+	int weapon = GetEntPropEnt(entity, Prop_Data, "m_hWeaponModel");
+	if(weapon != -1) {
+		RemoveEntity(weapon);
+	}
 }

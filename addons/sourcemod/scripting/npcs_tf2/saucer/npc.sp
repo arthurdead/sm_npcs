@@ -13,11 +13,7 @@ void tf2_saucer_init()
 {
 	npc_health_cvar = CreateConVar("tf_saucer_health", "1000");
 
-	CustomEntityFactory factory = null;
-	npc_datamap_init(register_nextbot_factory("npc_tf2_saucer", "TF2Saucer", _, _, factory));
-
-	npc_datamap_init(register_robot_nextbot_factory("npc_tf2_saucer_robothealthbar", "TF2Saucer"));
-	npc_datamap_init(register_tankboss_nextbot_factory("npc_tf2_saucer_tankhealthbar", "TF2Saucer"));
+	create_npc_factories("npc_tf2_saucer", "TF2Saucer", npc_datamap_init);
 
 	CustomPopulationSpawnerEntry spawner = register_popspawner("TF2Saucer");
 	spawner.Parse = base_npc_pop_parse;
@@ -97,7 +93,7 @@ static Action npc_think(int entity)
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
 
-	npc_hull_debug(bot, body, locomotion, entity);
+	//npc_hull_debug(bot, body, locomotion, entity);
 
 	npc_resolve_collisions(entity);
 
@@ -136,13 +132,13 @@ static void npc_spawn(int entity)
 {
 	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 2.0);
 	SetEntityModel(entity, TF2_SAUCER_MODEL);
-	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_GREEN);
+	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Saucer");
 
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, NULL_VECTOR, 135.0, 500.0);
+	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 24.0, 72.0}), 135.0, 500.0);
 	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
@@ -173,7 +169,7 @@ static Action timer_npc_idlesound(Handle timer, int entity)
 
 void tf2_saucer_destroyed(int entity)
 {
-	Handle timer = GetEntProp(entity, Prop_Data, "m_hIdleSoundTimer");
+	Handle timer = view_as<Handle>(GetEntProp(entity, Prop_Data, "m_hIdleSoundTimer"));
 	if(timer != null) {
 		KillTimer(timer);
 	}
