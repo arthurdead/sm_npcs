@@ -35,6 +35,13 @@ void shared_handle_anim(ILocomotion locomotion, IBody body, bool sight_clear, in
 
 bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check_ground = true)
 {
+	if(victim >= 1 && victim <= MaxClients) {
+		if(IsClientSourceTV(victim) ||
+			IsClientReplay(victim)) {
+			return false;
+		}
+	}
+
 	if(victim == 0 ||
 		victim == -1 ||
 		victim == entity ||
@@ -125,31 +132,6 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 
 	int closest_victim = -1;
 	int new_victim = -1;
-
-	for(int i = 1; i <= MaxClients; ++i) {
-		if(!IsClientInGame(i) ||
-			IsClientSourceTV(i) ||
-			IsClientReplay(i)) {
-			continue;
-		}
-
-		if(!shared_is_victim_chaseable(bot, entity, i)) {
-			continue;
-		}
-
-		float range = bot.GetRangeSquaredToEntity(i);
-		if(range < visible_victim_range) {
-			if(vision.IsLineOfSightClearToEntity(i)) {
-				closest_victim = i;
-				visible_victim_range = range;
-			}
-		}
-
-		if(range < victim_range) {
-			new_victim = i;
-			victim_range = range;
-		}
-	}
 
 	int i = -1;
 	while((i = FindEntityByClassname(i, "*")) != -1) {
