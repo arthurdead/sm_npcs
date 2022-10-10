@@ -3,12 +3,32 @@
 #endif
 #define __sm_npcs_inc
 
-#include <datamaps>
+#if !defined REQUIRE_PLUGIN
+	#define __SMNPC_PL_OPTIONAL
+#endif
+
+#if !defined REQUIRE_EXTENSIONS
+	#define __SMNPC_EXT_OPTIONAL
+#endif
+
+#undef REQUIRE_EXTENSIONS
+#undef REQUIRE_PLUGIN
 #include <popspawner>
+
+#if !defined __SMNPC_PL_OPTIONAL
+	#define REQUIRE_PLUGIN
+#endif
+
+#if !defined __SMNPC_EXT_OPTIONAL
+	#define REQUIRE_EXTENSIONS
+#endif
+
+#include <datamaps>
 #include <nextbot>
 
 #define DAMAGE_NO 0
 #define DAMAGE_YES 2
+#define DAMAGE_EVENTS_ONLY 1
 #define LIFE_ALIVE 0
 
 #define EFL_KILLME (1 << 0)
@@ -17,6 +37,19 @@
 #define EF_BONEMERGE 0x001
 #define EF_BONEMERGE_FASTCULL 0x080
 #define EF_PARENT_ANIMATES 0x200
+
+#define SOLID_NONE 0
+#define FSOLID_NOT_SOLID 0x0004
+#define COLLISION_GROUP_NONE 0
+
+enum
+{
+	DONT_BLEED = -1,
+	BLOOD_COLOR_RED = 0,
+	BLOOD_COLOR_YELLOW,
+	BLOOD_COLOR_GREEN,
+	BLOOD_COLOR_MECH,
+};
 
 native int base_npc_pop_health_impl(CustomPopulationSpawner spawner, int num, int health);
 native bool base_npc_pop_attrs_impl(CustomPopulationSpawner spawner, AttributeType attr, int num);
@@ -31,12 +64,45 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 
 native bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner spawner, const float pos[3], ArrayList result);
 
-native void ground_npc_spawn(INextBot bot, int entity, int health, const float hull[3], float walk_speed, float run_speed);
-native void flying_npc_spawn(INextBot bot, int entity, int health, const float hull[3], float altitude, float acceleration);
+native void ground_npc_spawn(INextBot bot, int entity, int health, const float hull[2], float walk_speed, float run_speed);
+native void flying_npc_spawn(INextBot bot, int entity, int health, const float hull[2], float altitude, float acceleration);
+
+native void TE_SetupBloodSprite2Ex(const float pos[3], const float dir[3], const int color[4], int Size);
+
+stock void TE_SetupBloodSprite2(const float pos[3], const float dir[3], int color, int Size)
+{
+	int rgba[4];
+
+	switch(color) {
+		case DONT_BLEED: return;
+		case BLOOD_COLOR_RED: {
+			rgba[0] = 75;
+		}
+		case BLOOD_COLOR_YELLOW: {
+			rgba[0] = 195;
+			rgba[1] = 195;
+		}
+		case BLOOD_COLOR_MECH: {
+			rgba[0] = 20;
+			rgba[1] = 20;
+			rgba[2] = 20;
+		}
+		case BLOOD_COLOR_GREEN: {
+			rgba[0] = 195;
+			rgba[1] = 195;
+		}
+	}
+
+	rgba[3] = 255;
+
+	TE_SetupBloodSprite2Ex(pos, dir, rgba, Size);
+}
 
 native void npc_resolve_collisions(int entity);
 native void handle_playbackrate(int entity, ILocomotion locomotion, IBody body);
 native void handle_move_yaw(int entity, int pose, ILocomotion locomotion);
+
+native void npc_hull_debug(INextBot bot, IBody body, ILocomotion locomotion, int entity);
 
 native int find_particle(const char[] name);
 
@@ -81,6 +147,8 @@ typedef handle_fire_func_t = function void (CustomBehaviorAction action, int ent
 typedef setup_next_action_func_t = function void (CustomBehaviorAction action);
 
 native CustomBehaviorActionEntry get_behavior_action(const char[] name);
+
+forward void basic_behaviors_created();
 
 typedef npc_datamap_init_func_t = function void (CustomDatamap datamap);
 

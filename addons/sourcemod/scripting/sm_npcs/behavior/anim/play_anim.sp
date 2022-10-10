@@ -21,16 +21,12 @@ static BehaviorResultType play_anim_complete(CustomBehaviorAction action, INextB
 		Call_Finish();
 	}
 
-	result.action = next_action;
-	result.set_reason("anim complete");
-	result.priority = RESULT_TRY;
-	return BEHAVIOR_CHANGE_TO;
+	return result.TryChangeTo(next_action, _, "anim complete");
 }
 
 static BehaviorResultType play_anim_interrupted(CustomBehaviorAction action, INextBot bot, int entity, int ground, BehaviorResult result)
 {
-	result.priority = RESULT_TRY;
-	return BEHAVIOR_CONTINUE;
+	return result.TryContinue();
 }
 
 BehaviorResultType play_anim_start(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
@@ -45,5 +41,5 @@ BehaviorResultType play_anim_start(CustomBehaviorAction action, INextBot bot, in
 
 	body.StartActivity(act, flags);
 
-	return BEHAVIOR_CONTINUE;
+	return result.Continue();
 }

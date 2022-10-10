@@ -144,14 +144,20 @@ static Activity npc_translate_act(IBodyCustom body, Activity act)
 
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 {
+	float dir[3];
+	TE_SetupBloodSprite2(info.m_vecDamagePosition, dir, BLOOD_COLOR_GREEN, 5);
+	TE_SendToAll();
+
 	return Plugin_Continue;
 }
 
 static void npc_spawn(int entity)
 {
 	SetEntityModel(entity, "models/tf2_invasion/alien_commando_v2.mdl");
-	SetEntProp(entity, Prop_Data, "m_bloodColor", BLOOD_COLOR_GREEN);
+	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Alien Commando");
+
+	SetEntProp(entity, Prop_Data, "m_takedamage", 1);
 
 	SetEntProp(entity, Prop_Send, "m_nSkin", GetURandomInt() % 3);
 	SetEntProp(entity, Prop_Send, "m_nBody", GetURandomInt() % 2);
@@ -159,7 +165,7 @@ static void npc_spawn(int entity)
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 24.0, 72.0}), 175.0, 175.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 72.0}), 175.0, 175.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(tf2i_alien_commando_behavior, "TF2IAlienCommandoBehavior");

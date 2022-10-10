@@ -30,7 +30,7 @@ static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot
 	shared_path_init(path);
 	action.set_data("path", path);
 
-	return BEHAVIOR_CONTINUE;
+	return result.Continue();
 }
 
 static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
@@ -166,5 +166,5 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 		}
 	}
 
-	return BEHAVIOR_CONTINUE;
+	return result.Continue();
 }

@@ -9,12 +9,27 @@ CustomBehaviorActionEntry basic_range_action;
 
 #include "npcs_tf2/saucer/npc.sp"
 
+static bool late_loaded;
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	late_loaded = late;
+	return APLRes_Success;
+}
+
 public void OnPluginStart()
 {
 	tf2_saucer_init();
 }
 
 public void OnAllPluginsLoaded()
+{
+	if(late_loaded) {
+		basic_behaviors_created();
+	}
+}
+
+public void basic_behaviors_created()
 {
 	basic_range_action = get_behavior_action("BasicRange");
 }

@@ -69,46 +69,19 @@ void tf2_saucer_created(int entity)
 	SDKHook(entity, SDKHook_SpawnPost, npc_spawn);
 }
 
-static void fire_animevents(int entity)
-{
-	int sequence = GetEntProp(entity, Prop_Send, "m_nSequence");
-
-	int frame = AnimatingSequenceFrame(entity);
-
-	int event_idx = -1;
-
-	
-
-	if(event_idx != -1 && GetEntPropFloat(entity, Prop_Send, "m_flNextAttack") < GetGameTime()) {
-		animevent_t event;
-		event.event = event_idx;
-		AnimatingHandleAnimEvent(entity, event);
-		SetEntPropFloat(entity, Prop_Send, "m_flNextAttack", GetGameTime()+0.1);
-	}
-}
-
 static Action npc_think(int entity)
 {
 	INextBot bot = INextBot(entity);
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
 
-	//npc_hull_debug(bot, body, locomotion, entity);
+	npc_hull_debug(bot, body, locomotion, entity);
 
 	npc_resolve_collisions(entity);
 
 	//handle_playbackrate(entity, locomotion, body);
 
 	SetEntPropFloat(entity, Prop_Send, "m_flPlaybackRate", 2.0);
-
-	fire_animevents(entity);
-
-	return Plugin_Continue;
-}
-
-static Action npc_handle_animevent(int entity, animevent_t event)
-{
-	
 
 	return Plugin_Continue;
 }
@@ -125,7 +98,16 @@ static Activity npc_translate_act(IBodyCustom body, Activity act)
 
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 {
+	float dir[3];
+	TE_SetupBloodSprite2(info.m_vecDamagePosition, dir, BLOOD_COLOR_MECH, 5);
+	TE_SendToAll();
+
 	return Plugin_Continue;
+}
+
+static void npc_pitch(NextBotFlyingLocomotion locomotion, float &pitch)
+{
+	pitch = 0.0;
 }
 
 static void npc_spawn(int entity)
@@ -135,14 +117,13 @@ static void npc_spawn(int entity)
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Saucer");
 
-	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
-
 	INextBot bot = INextBot(entity);
-	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 24.0, 72.0}), 135.0, 500.0);
+	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({95.0, 40.0}), 135.0, 500.0);
 	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
-	custom_locomotion.AllowFacing = false;
+	custom_locomotion.AllowFacing = true;
+	custom_locomotion.set_function("LimitPitch", npc_pitch);
 
 	bot.AllocateCustomIntention(tf2_saucer_behavior, "TF2SaucerBehavior");
 
@@ -152,8 +133,9 @@ static void npc_spawn(int entity)
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 
-	EmitSoundToAll("e_o_mvm_2.wav", entity, SNDCHAN_BODY, SNDLEVEL_AIRCRAFT);
-	SetEntProp(entity, Prop_Data, "m_hIdleSoundTimer", CreateTimer(1.0, timer_npc_idlesound, EntIndexToEntRef(entity), TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE));
+	Handle idle_sound_timer = CreateTimer(1.0, timer_npc_idlesound, EntIndexToEntRef(entity), TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	TriggerTimer(idle_sound_timer, true);
+	SetEntProp(entity, Prop_Data, "m_hIdleSoundTimer", idle_sound_timer);
 }
 
 static Action timer_npc_idlesound(Handle timer, int entity)

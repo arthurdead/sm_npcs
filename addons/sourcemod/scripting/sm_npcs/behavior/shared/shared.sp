@@ -164,6 +164,8 @@ BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int e
 {
 	PathFollower path = bot.CurrentPath;
 
+	bool teleported = false;
+
 	Segment goal = path.CurrentGoal;
 	while(goal != Segment_Null) {
 		float pos[3];
@@ -171,23 +173,26 @@ BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int e
 
 		float height = STEP_HEIGHT;
 
-		ILocomotion locomotion = bot.LocomotionInterface;
+		AnyLocomotion locomotion = view_as<AnyLocomotion>(bot.LocomotionInterface);
 		if(locomotion.Type == Locomotion_FlyingCustom) {
-			height = view_as<NextBotFlyingLocomotion>(locomotion).DesiredAltitude;
+			height = locomotion.DesiredAltitude;
 		} else {
 			height = locomotion.StepHeight;
 		}
 
+		IBody body = bot.BodyInterface;
+
 		float mins[3];
-		GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+		body.GetHullMins(mins);
 		float maxs[3];
-		GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+		body.GetHullMaxs(maxs);
 
 		height += -mins[2];
 
 		pos[2] += height;
 
 		if(can_spawn_here(mins, maxs, pos)) {
+			teleported = true;
 			TeleportEntity(entity, pos);
 			break;
 		}
@@ -195,8 +200,11 @@ BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int e
 		goal = path.NextSegment(goal);
 	}
 
-	result.priority = RESULT_TRY;
-	return BEHAVIOR_CONTINUE;
+	if(!teleported) {
+		path.Invalidate();
+	}
+
+	return result.TryContinue();
 }
 
 void shared_path_init(PathFollower path)
@@ -216,9 +224,7 @@ BehaviorResultType shared_killed(CustomBehaviorAction action, INextBot bot, int 
 		Call_Finish(res);
 
 		if(!res) {
-			result.set_reason("npc killed");
-			result.priority = RESULT_IMPORTANT;
-			return BEHAVIOR_DONE;
+			return result.TryDone(RESULT_CRITICAL, "npc killed");
 		}
 	}
 
@@ -228,9 +234,7 @@ BehaviorResultType shared_killed(CustomBehaviorAction action, INextBot bot, int 
 		RequestFrame(frame_remove_npc, EntIndexToEntRef(entity));
 	}
 
-	result.set_reason("npc killed");
-	result.priority = RESULT_IMPORTANT;
-	return BEHAVIOR_DONE;
+	return result.TryDone(RESULT_CRITICAL, "npc killed");
 }
 
 void shared_handle_speed(int entity, INextBot bot, ILocomotion locomotion, IBody body, int victim)

@@ -46,7 +46,7 @@ static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot
 	shared_path_init(path);
 	action.set_data("path", path);
 
-	return BEHAVIOR_CONTINUE;
+	return result.Continue();
 }
 
 static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
@@ -67,6 +67,10 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	ILocomotion locomotion = bot.LocomotionInterface;
 
 	float chase_range = RANGED_RANGE - 5.0;
+
+	if(sm_npcs_debug_pathing.BoolValue) {
+		chase_range = 5.0;
+	}
 
 	ArousalType arousal = NEUTRAL;
 
@@ -105,15 +109,17 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 		}
 
 		if(sight_clear) {
-			Handle pl;
-			Function func = action.get_function("handle_fire", pl);
-			if(func != INVALID_FUNCTION && pl != null) {
-				Call_StartFunction(pl, func);
-				Call_PushCell(action);
-				Call_PushCell(entity);
-				Call_PushCell(victim);
-				Call_PushArray(sight_pos, 3);
-				Call_Finish();
+			if(!sm_npcs_debug_pathing.BoolValue) {
+				Handle pl;
+				Function func = action.get_function("handle_fire", pl);
+				if(func != INVALID_FUNCTION && pl != null) {
+					Call_StartFunction(pl, func);
+					Call_PushCell(action);
+					Call_PushCell(entity);
+					Call_PushCell(victim);
+					Call_PushArray(sight_pos, 3);
+					Call_Finish();
+				}
 			}
 
 			arousal = INTENSE;
@@ -215,5 +221,5 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 
 	body.Arousal = arousal;
 
-	return BEHAVIOR_CONTINUE;
+	return result.Continue();
 }
