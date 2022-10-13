@@ -45,8 +45,7 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 	if(victim == 0 ||
 		victim == -1 ||
 		victim == entity ||
-		bot.IsSelf(victim) ||
-		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME) {
+		bot.IsSelf(victim)) {
 		return false;
 	}
 
@@ -64,27 +63,8 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 		}
 	}
 
-	if(GetEntProp(victim, Prop_Data, "m_takedamage") == DAMAGE_NO ||
-		GetEntProp(victim, Prop_Data, "m_lifeState") != LIFE_ALIVE ||
-		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME ||
-		GetEntityFlags(victim) & FL_NOTARGET) {
+	if(!entity_is_damageable(victim, false)) {
 		return false;
-	}
-
-	if(victim >= 1 && victim <= MaxClients) {
-		if(!IsPlayerAlive(victim) ||
-			GetClientTeam(victim) < 2 ||
-			TF2_GetPlayerClass(victim) == TFClass_Unknown) {
-			return false;
-		}
-
-		if(TF2_IsPlayerInCondition(victim, TFCond_HalloweenGhostMode) ||
-			TF2_IsPlayerInCondition(victim, TFCond_Ubercharged) ||
-			TF2_IsPlayerInCondition(victim, TFCond_UberchargedHidden) ||
-			TF2_IsPlayerInCondition(victim, TFCond_UberchargedCanteen) ||
-			TF2_IsPlayerInCondition(victim, TFCond_UberchargedOnTakeDamage)) {
-			return false;
-		}
 	}
 
 	int my_team = GetEntProp(entity, Prop_Data, "m_iTeamNum");
@@ -162,46 +142,49 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 
 BehaviorResultType shared_stuck(CustomBehaviorAction action, INextBot bot, int entity, BehaviorResult result)
 {
-	PathFollower path = bot.CurrentPath;
-
 	bool teleported = false;
 
-	Segment goal = path.CurrentGoal;
-	while(goal != Segment_Null) {
-		float pos[3];
-		goal.GetPosition(pos);
+	int mask = bot.BodyInterface.SolidMask;
 
-		float height = STEP_HEIGHT;
+	float pos[3];
 
-		AnyLocomotion locomotion = view_as<AnyLocomotion>(bot.LocomotionInterface);
-		if(locomotion.Type == Locomotion_FlyingCustom) {
-			height = locomotion.DesiredAltitude;
-		} else {
-			height = locomotion.StepHeight;
-		}
+	float mins[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecMins", mins);
+	float maxs[3];
+	GetEntPropVector(entity, Prop_Data, "m_vecMaxs", maxs);
 
-		IBody body = bot.BodyInterface;
-
-		float mins[3];
-		body.GetHullMins(mins);
-		float maxs[3];
-		body.GetHullMaxs(maxs);
-
-		height += -mins[2];
-
-		pos[2] += height;
-
-		if(can_spawn_here(mins, maxs, pos)) {
-			teleported = true;
-			TeleportEntity(entity, pos);
-			break;
-		}
-
-		goal = path.NextSegment(goal);
+	PathFollower path = bot.CurrentPath;
+	if(path == null) {
+		return result.TryContinue();
 	}
 
 	if(!teleported) {
-		path.Invalidate();
+		Segment goal = path.CurrentGoal;
+		while(goal != Segment_Null) {
+			goal.GetPosition(pos);
+
+			pos[2] += -mins[2] + STEP_HEIGHT;
+
+			if(can_spawn_here(mask, mins, maxs, pos)) {
+				teleported = true;
+				TeleportEntity(entity, pos);
+				break;
+			}
+
+			goal = path.NextSegment(goal);
+		}
+	}
+
+	if(!teleported) {
+		Segment goal = path.CurrentGoal;
+		if(goal != Segment_Null) {
+			goal.GetPosition(pos);
+
+			pos[2] += -mins[2] + STEP_HEIGHT;
+
+			teleported = true;
+			TeleportEntity(entity, pos);
+		}
 	}
 
 	return result.TryContinue();

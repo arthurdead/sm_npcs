@@ -30,10 +30,10 @@ static bool modifier_spawner_loaded;
 static bool popspawner_loaded;
 static bool listen_loaded;
 
-stock bool can_spawn_here(const float mins[3], float maxs[3], const float pos[3])
+stock bool can_spawn_here(int mask, const float mins[3], float maxs[3], const float pos[3])
 {
-	TR_TraceHull(pos, pos, mins, maxs, MASK_NPCSOLID);
-	return TR_GetFraction() >= 0.8;
+	TR_TraceHull(pos, pos, mins, maxs, mask);
+	return TR_GetFraction() == 1.0;
 }
 
 stock float GetVectorLength2D(const float vec[3])
@@ -325,13 +325,10 @@ static any native_ground_npc_spawn(Handle plugin, int params)
 	int entity = GetNativeCell(2);
 	int health = GetNativeCell(3);
 
-	float hull[2]
-	GetNativeArray(4, hull, 2);
+	float walk_speed = GetNativeCell(4);
+	float run_speed = GetNativeCell(5);
 
-	float walk_speed = GetNativeCell(5);
-	float run_speed = GetNativeCell(6);
-
-	shared_npc_spawn(bot, entity, health, hull, walk_speed, run_speed, false);
+	shared_npc_spawn(bot, entity, health, walk_speed, run_speed, false);
 	return 0;
 }
 
@@ -341,13 +338,10 @@ static any native_flying_npc_spawn(Handle plugin, int params)
 	int entity = GetNativeCell(2);
 	int health = GetNativeCell(3);
 
-	float hull[2]
-	GetNativeArray(4, hull, 2);
+	float altitude = GetNativeCell(4);
+	float acceleration = GetNativeCell(5);
 
-	float altitude = GetNativeCell(5);
-	float acceleration = GetNativeCell(6);
-
-	shared_npc_spawn(bot, entity, health, hull, altitude, acceleration, true);
+	shared_npc_spawn(bot, entity, health, altitude, acceleration, true);
 	return 0;
 }
 
@@ -439,7 +433,7 @@ static any native_npc_hull_debug(Handle plugin, int params)
 
 	if(bot.IsDebugging(NEXTBOT_LOCOMOTION)) {
 		float pos[3];
-		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
+		bot.GetPosition(pos);
 
 		float ang[3];
 		GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
@@ -485,10 +479,11 @@ static any native_npc_hull_debug(Handle plugin, int params)
 
 static any native_npc_resolve_collisions(Handle plugin, int params)
 {
-	int entity = GetNativeCell(1);
+	INextBot bot = GetNativeCell(1);
+	int entity = GetNativeCell(2);
 
 	float npc_pos[3];
-	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", npc_pos);
+	bot.GetPosition(npc_pos);
 
 	float npc_mins[3];
 	GetEntPropVector(entity, Prop_Data, "m_vecMins", npc_mins);
@@ -638,12 +633,13 @@ static Action tankhealthbar_think(int entity, const char[] context)
 	return Plugin_Continue;
 }
 
-static void shared_npc_spawn(INextBot bot, int entity, int health, const float hull[2], float walk_speed, float run_speed, bool fly)
+static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_speed, float run_speed, bool fly)
 {
 	AnyLocomotion custom_locomotion = bot.AllocateLocomotion(fly);
 	if(fly) {
 		custom_locomotion.MaxJumpHeight = walk_speed;
 		custom_locomotion.DeathDropHeight = 9999999.0;
+		custom_locomotion.TraversableSlopeLimit = 9999999.0;
 		custom_locomotion.StepHeight = walk_speed;
 		custom_locomotion.WalkSpeed = run_speed;
 		custom_locomotion.RunSpeed = run_speed;
@@ -660,11 +656,10 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 	bot.AllocateCustomVision();
 
 	IBodyCustom body_custom = bot.AllocateCustomBody();
-
 	body_custom.set_data("walk_anim_speed", walk_speed);
 	body_custom.set_data("run_anim_speed", run_speed);
 
-	set_npc_hull(body_custom, entity, hull);
+	set_npc_hull(body_custom, entity);
 
 	if(health == 0) {
 		SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_NO);
@@ -700,6 +695,19 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 		custom_locomotion.set_function("ShouldCollideWith", npc_loc_collide);
 	}
 
+	int solidmask = MASK_NPCSOLID;
+
+	switch(team) {
+		case TF_TEAM_RED: {
+			solidmask |= CONTENTS_BLUETEAM;
+		}
+		case TF_TEAM_BLUE: {
+			solidmask |= CONTENTS_REDTEAM;
+		}
+	}
+
+	body_custom.SolidMask = solidmask;
+
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
@@ -729,24 +737,21 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, const float h
 	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
 }
 
-void set_npc_hull(IBodyCustom body_custom, int entity, const float hull[2])
+void set_npc_hull(IBodyCustom body_custom, int entity)
 {
-	float width = hull[0];
-	float height = hull[1];
-
 	float mins[3];
-	mins[0] = -width;
-	mins[1] = -width;
-	mins[2] = 0.0;
-	SetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+	GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
 
 	float maxs[3];
-	maxs[0] = width;
-	maxs[1] = width;
-	maxs[2] = height;
-	SetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+	GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
 
-	body_custom.HullWidth = (width * 2.0);
+	float width = maxs[1] > mins[1] ? maxs[1] : mins[1];
+	float height = maxs[2];
+
+	width += 1.0;
+	height += 1.0;
+
+	body_custom.HullWidth = width;
 
 	body_custom.CrouchHullHeight = height;
 	body_custom.StandHullHeight = height;

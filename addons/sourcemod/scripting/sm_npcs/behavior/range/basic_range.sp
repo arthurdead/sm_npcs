@@ -69,7 +69,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	float chase_range = RANGED_RANGE - 5.0;
 
 	if(sm_npcs_debug_pathing.BoolValue) {
-		chase_range = 5.0;
+		chase_range = 50.0;
 	}
 
 	ArousalType arousal = NEUTRAL;
@@ -115,6 +115,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 				if(func != INVALID_FUNCTION && pl != null) {
 					Call_StartFunction(pl, func);
 					Call_PushCell(action);
+					Call_PushCell(bot);
 					Call_PushCell(entity);
 					Call_PushCell(victim);
 					Call_PushArray(sight_pos, 3);

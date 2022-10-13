@@ -86,7 +86,7 @@ static Action npc_think(int entity)
 
 	//npc_hull_debug(bot, body, locomotion, entity);
 
-	npc_resolve_collisions(entity);
+	npc_resolve_collisions(bot, entity);
 
 	handle_playbackrate(entity, locomotion, body);
 	handle_move_yaw(entity, npc_move_yaw, locomotion);
@@ -165,7 +165,7 @@ static void npc_spawn(int entity)
 	AnimatingHookHandleAnimEvent(entity, npc_handle_animevent);
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({24.0, 72.0}), 175.0, 175.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 175.0, 175.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(tf2i_alien_commando_behavior, "TF2IAlienCommandoBehavior");
@@ -175,7 +175,7 @@ static void npc_spawn(int entity)
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 
-	int weapon = create_attach_model(entity, "models/workshop/weapons/c_models/c_drg_cowmangler/c_drg_cowmangler.mdl", "0");
+	int weapon = create_attach_model(entity, "models/workshop/weapons/c_models/c_invasion_sniperrifle/c_invasion_sniperrifle.mdl", "0");
 	SetEntPropVector(weapon, Prop_Send, "m_angRotation", view_as<float>({-90.0, -90.0, 0.0}));
 	SetEntPropVector(weapon, Prop_Send, "m_vecOrigin", view_as<float>({0.0, 0.0, 20.0}));
 	SetEntProp(weapon, Prop_Send, "m_nSkin", 1);

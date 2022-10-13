@@ -77,7 +77,7 @@ static Action npc_think(int entity)
 
 	npc_hull_debug(bot, body, locomotion, entity);
 
-	npc_resolve_collisions(entity);
+	npc_resolve_collisions(bot, entity);
 
 	//handle_playbackrate(entity, locomotion, body);
 
@@ -112,17 +112,17 @@ static void npc_pitch(NextBotFlyingLocomotion locomotion, float &pitch)
 
 static void npc_spawn(int entity)
 {
-	SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 2.0);
 	SetEntityModel(entity, TF2_SAUCER_MODEL);
+	SetEntityModelScale(entity, 2.0);
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Saucer");
 
 	INextBot bot = INextBot(entity);
-	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, view_as<float>({95.0, 40.0}), 135.0, 500.0);
+	flying_npc_spawn(bot, entity, npc_health_cvar.IntValue, 300.0, 500.0);
 	HookEntityThink(entity, npc_think);
 
 	NextBotFlyingLocomotion custom_locomotion = view_as<NextBotFlyingLocomotion>(bot.LocomotionInterface);
-	custom_locomotion.AllowFacing = true;
+	custom_locomotion.AllowFacing = false;
 	custom_locomotion.set_function("LimitPitch", npc_pitch);
 
 	bot.AllocateCustomIntention(tf2_saucer_behavior, "TF2SaucerBehavior");
@@ -133,7 +133,7 @@ static void npc_spawn(int entity)
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 
-	Handle idle_sound_timer = CreateTimer(1.0, timer_npc_idlesound, EntIndexToEntRef(entity), TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	Handle idle_sound_timer = CreateTimer(1.0, timer_npc_idlesound, EntIndexToEntRef(entity), TIMER_REPEAT);
 	TriggerTimer(idle_sound_timer, true);
 	SetEntProp(entity, Prop_Data, "m_hIdleSoundTimer", idle_sound_timer);
 }
@@ -154,6 +154,7 @@ void tf2_saucer_destroyed(int entity)
 	Handle timer = view_as<Handle>(GetEntProp(entity, Prop_Data, "m_hIdleSoundTimer"));
 	if(timer != null) {
 		KillTimer(timer);
+		SetEntProp(entity, Prop_Data, "m_hIdleSoundTimer", 0);
 	}
 
 	StopSound(entity, SNDCHAN_BODY, "e_o_mvm_2.wav");

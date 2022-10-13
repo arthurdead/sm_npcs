@@ -64,8 +64,8 @@ stock bool base_npc_pop_parse(CustomPopulationSpawner spawner, KeyValues data)
 
 native bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner spawner, const float pos[3], ArrayList result);
 
-native void ground_npc_spawn(INextBot bot, int entity, int health, const float hull[2], float walk_speed, float run_speed);
-native void flying_npc_spawn(INextBot bot, int entity, int health, const float hull[2], float altitude, float acceleration);
+native void ground_npc_spawn(INextBot bot, int entity, int health, float walk_speed, float run_speed);
+native void flying_npc_spawn(INextBot bot, int entity, int health, float altitude, float acceleration);
 
 native void TE_SetupBloodSprite2Ex(const float pos[3], const float dir[3], const int color[4], int Size);
 
@@ -98,13 +98,21 @@ stock void TE_SetupBloodSprite2(const float pos[3], const float dir[3], int colo
 	TE_SetupBloodSprite2Ex(pos, dir, rgba, Size);
 }
 
-native void npc_resolve_collisions(int entity);
+native void npc_resolve_collisions(INextBot bot, int entity);
 native void handle_playbackrate(int entity, ILocomotion locomotion, IBody body);
 native void handle_move_yaw(int entity, int pose, ILocomotion locomotion);
 
 native void npc_hull_debug(INextBot bot, IBody body, ILocomotion locomotion, int entity);
 
 native int find_particle(const char[] name);
+
+stock void SetEntityModelScale(int entity, float scale)
+{
+	float vec[3];
+	vec[0] = scale;
+	SetVariantVector3D(vec);
+	AcceptEntityInput(entity, "SetModelScale");
+}
 
 stock int create_attach_model(int owner, const char[] model, const char[] attach)
 {
@@ -131,6 +139,39 @@ stock int create_bonemerge_model(int owner, const char[] model, const char[] att
 	return merge;
 }
 
+stock bool entity_is_damageable(int victim, bool ignore_uber)
+{
+	if(GetEntProp(victim, Prop_Data, "m_takedamage") == DAMAGE_NO ||
+		GetEntProp(victim, Prop_Data, "m_lifeState") != LIFE_ALIVE ||
+		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME ||
+		GetEntityFlags(victim) & FL_NOTARGET) {
+		return false;
+	}
+
+	if(victim >= 1 && victim <= MaxClients) {
+		if(!IsPlayerAlive(victim) ||
+			GetClientTeam(victim) < 2 ||
+			TF2_GetPlayerClass(victim) == TFClass_Unknown) {
+			return false;
+		}
+
+		if(TF2_IsPlayerInCondition(victim, TFCond_HalloweenGhostMode)) {
+			return false;
+		}
+
+		if(!ignore_uber) {
+			if(TF2_IsPlayerInCondition(victim, TFCond_Ubercharged) ||
+				TF2_IsPlayerInCondition(victim, TFCond_UberchargedHidden) ||
+				TF2_IsPlayerInCondition(victim, TFCond_UberchargedCanteen) ||
+				TF2_IsPlayerInCondition(victim, TFCond_UberchargedOnTakeDamage)) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 //BasicMelee.handle_swing
 typedef handle_swing_func_t = function void (int entity);
 
@@ -141,7 +182,7 @@ typedef handle_idle_func_t = function void (int entity);
 typedef handle_die_func_t = function bool (int entity);
 
 //BasicRange.handle_fire
-typedef handle_fire_func_t = function void (CustomBehaviorAction action, int entity, int victim, const float sight_pos[3]);
+typedef handle_fire_func_t = function void (CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3]);
 
 //PlayAnim.setup_next_action
 typedef setup_next_action_func_t = function void (CustomBehaviorAction action);

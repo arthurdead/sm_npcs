@@ -1,4 +1,4 @@
-static void handle_fire(CustomBehaviorAction action, int entity, int victim, const float sight_pos[3])
+static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3])
 {
 	float attack_time = action.get_data("attack_time");
 	if(attack_time < GetGameTime()) {

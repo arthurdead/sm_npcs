@@ -1,11 +1,11 @@
-static void handle_fire(CustomBehaviorAction action, int entity, int victim, const float sight_pos[3])
+static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3])
 {
 	float attack_time = action.get_data("attack_time");
 	if(attack_time < GetGameTime()) {
 		FireBulletsInfo_t bullets;
 		bullets.Init();
 
-		GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", bullets.m_vecSrc);
+		bot.GetPosition(bullets.m_vecSrc);
 
 		SubtractVectors(sight_pos, bullets.m_vecSrc, bullets.m_vecDirShooting);
 
