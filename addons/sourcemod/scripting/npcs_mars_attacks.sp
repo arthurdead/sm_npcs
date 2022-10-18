@@ -4,10 +4,12 @@
 #include <popspawner>
 #include <animhelpers>
 #include <sm_npcs>
+#include <teammanager>
+#include <rulestools>
 
-CustomBehaviorActionEntry basic_range_action;
+CustomBehaviorActionEntry main_action;
 
-#include "npcs_tf2/saucer/npc.sp"
+#include "npcs_mars_attacks/martian/npc.sp"
 
 static bool late_loaded;
 
@@ -19,7 +21,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	tf2_saucer_init();
+	mars_attacks_martian_init();
 }
 
 public void OnAllPluginsLoaded()
@@ -31,27 +33,27 @@ public void OnAllPluginsLoaded()
 
 public void basic_behaviors_created()
 {
-	basic_range_action = get_behavior_action("BasicRange");
+	main_action = get_behavior_action("Main");
 }
 
 public void OnMapStart()
 {
 	int entity = CreateEntityByName("prop_dynamic_override");
 
-	tf2_saucer_precache(entity);
+	mars_attacks_martian_precache(entity);
 
 	RemoveEntity(entity);
 }
 
 public void OnPluginEnd()
 {
-	remove_entities_of_classname("npc_tf2_*");
+	remove_entities_of_classname("npc_mars_attacks_*");
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	if(StrContains(classname, "npc_tf2_saucer") != -1) {
-		tf2_saucer_created(entity);
+	if(StrContains(classname, "npc_mars_attacks_martian") != -1) {
+		mars_attacks_martian_created(entity);
 	}
 }
 
@@ -64,7 +66,7 @@ public void OnEntityDestroyed(int entity)
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
-	if(StrContains(classname, "npc_tf2_saucer") != -1) {
-		tf2_saucer_destroyed(entity);
+	if(StrContains(classname, "npc_mars_attacks_martian") != -1) {
+		mars_attacks_martian_destroyed(entity);
 	}
 }

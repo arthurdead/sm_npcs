@@ -53,10 +53,7 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 		return false;
 	}
 
-	char classname[64];
-	GetEntityClassname(victim, classname, sizeof(classname));
-
-	if(StrContains(classname, "obj_") != -1) {
+	if(EntityIsBaseObject(victim)) {
 		int builder = GetEntPropEnt(victim, Prop_Send, "m_hBuilder");
 		if(builder == -1) {
 			return false;
@@ -105,7 +102,7 @@ bool shared_is_victim_chaseable(INextBot bot, int entity, int victim, bool check
 	return true;
 }
 
-int shared_select_victim(int entity, INextBot bot, IVision vision)
+int shared_select_victim(int entity, INextBot bot, IVision vision, bool check_ground = true)
 {
 	float victim_range = 9999999999.0;
 	float visible_victim_range = 999999999.0;
@@ -113,25 +110,54 @@ int shared_select_victim(int entity, INextBot bot, IVision vision)
 	int closest_victim = -1;
 	int new_victim = -1;
 
-	int i = -1;
-	while((i = FindEntityByClassname(i, "*")) != -1) {
-		if(!shared_is_victim_chaseable(bot, entity, i)) {
+	ArrayList entities = new ArrayList();
+
+	for(int i = 1; i <= MaxClients; ++i) {
+		if(!IsClientInGame(i) ||
+			IsClientSourceTV(i) ||
+			IsClientReplay(i)) {
 			continue;
 		}
 
-		float range = bot.GetRangeSquaredToEntity(i);
+		entities.Push(i);
+	}
+
+	ArrayList bots = new ArrayList();
+	CollectAllBots(bots);
+
+	int len = bots.Length;
+	for(int i = 0; i < len; ++i) {
+		INextBot victim_bot = bots.Get(i);
+		int victim = victim_bot.Entity;
+
+		entities.Push(victim);
+	}
+
+	delete bots;
+
+	len = entities.Length;
+	for(int i = 0; i < len; ++i) {
+		int victim = entities.Get(i);
+
+		if(!shared_is_victim_chaseable(bot, entity, victim, check_ground)) {
+			continue;
+		}
+
+		float range = bot.GetRangeSquaredToEntity(victim);
 		if(range < visible_victim_range) {
-			if(vision.IsLineOfSightClearToEntity(i)) {
-				closest_victim = i;
+			if(vision.IsLineOfSightClearToEntity(victim)) {
+				closest_victim = victim;
 				visible_victim_range = range;
 			}
 		}
 
 		if(range < victim_range) {
-			new_victim = i;
+			new_victim = victim;
 			victim_range = range;
 		}
 	}
+
+	delete entities;
 
 	if(closest_victim != -1) {
 		return closest_victim;

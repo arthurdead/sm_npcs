@@ -57,7 +57,7 @@ static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bo
 	IVision vision = bot.VisionInterface;
 
 	if(victim == -1 || !shared_is_victim_chaseable(bot, entity, victim, false) || (GetGameTime() - victim_time) > 10.0) {
-		victim = shared_select_victim(entity, bot, vision);
+		victim = shared_select_victim(entity, bot, vision, false);
 		action.set_data("victim", victim == -1 ? INVALID_ENT_REFERENCE : EntIndexToEntRef(victim));
 		action.set_data("victim_time", GetGameTime());
 	}

@@ -30,6 +30,7 @@ static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, i
 		bullets.forced_tracer_type = TRACER_PARTICLE;
 
 		FireBullets(weapon, bullets);
+		weapon_fired(entity);
 
 		EmitGameSoundToAll("Weapon_ShootingStar.SingleCharged", weapon);
 

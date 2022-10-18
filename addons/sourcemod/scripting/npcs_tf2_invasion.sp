@@ -45,7 +45,7 @@ public void OnMapStart()
 
 public void OnPluginEnd()
 {
-	remove_entities_of_classname("npc_tf2i_alien_commando*");
+	remove_entities_of_classname("npc_tf2i_*");
 }
 
 public void OnEntityCreated(int entity, const char[] classname)

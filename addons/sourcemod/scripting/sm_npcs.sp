@@ -5,6 +5,8 @@
 #include <datamaps>
 #include <nextbot>
 #include <animhelpers>
+#include <tf2>
+#include <tf2_stocks>
 
 #undef REQUIRE_EXTENSIONS
 #undef REQUIRE_PLUGIN
@@ -20,6 +22,8 @@
 #define REQUIRE_PLUGIN
 
 #include <sm_npcs>
+
+static bool late_loaded;
 
 #define npc_healthbar_robot (view_as<entity_healthbar_t>(view_as<int>(entity_healthbar_last)+0))
 #define npc_healthbar_tank  (view_as<entity_healthbar_t>(view_as<int>(entity_healthbar_last)+1))
@@ -51,6 +55,17 @@ stock void frame_remove_npc(int entity)
 	RemoveEntity(entity);
 }
 
+stock Action timer_remove_npc(Handle timer, int entity)
+{
+	entity = EntRefToEntIndex(entity);
+	if(entity == -1) {
+		return Plugin_Continue;
+	}
+
+	RemoveEntity(entity);
+	return Plugin_Continue;
+}
+
 stock float get_player_class_speed(int client)
 {
 	if(clsobj_hack_loaded) {
@@ -69,20 +84,186 @@ static ParticleEffectNames = INVALID_STRING_TABLE;
 
 ConVar sm_npcs_debug_pathing;
 
-#include "sm_npcs/behavior/shared/shared.sp"
-#include "sm_npcs/behavior/melee/basic_melee.sp"
-#include "sm_npcs/behavior/range/basic_range.sp"
-#include "sm_npcs/behavior/anim/play_anim.sp"
+ConVar tf_bot_notice_backstab_max_range;
+ConVar tf_bot_notice_backstab_min_range;
+ConVar tf_bot_notice_backstab_chance;
+ConVar tf_bot_wait_in_cover_min_time;
+ConVar tf_bot_wait_in_cover_max_time;
+ConVar tf_bot_retreat_to_cover_range;
+static ConVar tf_nav_in_combat_range;
+
+static ArrayList entity_npc_infos;
+
+enum struct DelayedTreatNoticeInfo
+{
+	int ref;
+
+	float when;
+}
+
+enum struct EntityNPCInfo
+{
+	int ref;
+	int __idx;
+
+	float __next_combat_time;
+
+	float __enemy_sentry_pos[3];
+	int __enemy_sentry_ref;
+
+	ArrayList __delayed_notices;
+
+	void created()
+	{
+		this.__delayed_notices = new ArrayList(sizeof(DelayedTreatNoticeInfo));
+	}
+
+	void destroyed()
+	{
+		delete this.__delayed_notices;
+	}
+
+	void __check_created()
+	{
+		if(this.__idx == -1) {
+			this.created();
+			this.__idx = entity_npc_infos.PushArray(this, sizeof(EntityNPCInfo));
+		}
+	}
+
+	void delayed_threat_notice(int entity, float time)
+	{
+		int ref = EntIndexToEntRef(entity);
+		float when = GetGameTime() + time;
+
+		this.__check_created();
+
+		int idx = this.__delayed_notices.FindValue(ref, DelayedTreatNoticeInfo::ref);
+		if(idx == -1) {
+			DelayedTreatNoticeInfo delayed_notice;
+			delayed_notice.ref = ref;
+			delayed_notice.when = when;
+			this.__delayed_notices.PushArray(delayed_notice, sizeof(DelayedTreatNoticeInfo));
+		} else {
+			this.__delayed_notices.Set(idx, when, DelayedTreatNoticeInfo::when);
+		}
+	}
+
+	void update_delayed_threat_notices(IVision vision)
+	{
+		this.__check_created();
+
+		DelayedTreatNoticeInfo delayed_notice;
+
+		int len = this.__delayed_notices.Length;
+		for(int i = 0; i < len;) {
+			this.__delayed_notices.GetArray(i, delayed_notice, sizeof(DelayedTreatNoticeInfo));
+
+			if(delayed_notice.when <= GetGameTime()) {
+				int who = EntRefToEntIndex(delayed_notice.ref);
+				if(who != -1) {
+					vision.AddKnownEntity(who);
+				}
+
+				this.__delayed_notices.Erase(i);
+				--len;
+				continue;
+			}
+
+			++i;
+		}
+	}
+
+	float get_next_combat_time()
+	{ return this.__next_combat_time; }
+	void set_next_combat_time(float time)
+	{
+		this.__next_combat_time = time;
+
+		this.__check_created();
+
+		entity_npc_infos.Set(this.__idx, time, EntityNPCInfo::__next_combat_time);
+	}
+
+	int get_enemy_sentry()
+	{ return EntRefToEntIndex(this.__enemy_sentry_ref); }
+	void remember_enemy_sentry(int sentry, const float pos[3])
+	{
+		this.__enemy_sentry_pos[0] = pos[0];
+		this.__enemy_sentry_pos[1] = pos[1];
+		this.__enemy_sentry_pos[2] = pos[2];
+
+		this.__enemy_sentry_ref = EntIndexToEntRef(sentry);
+
+		this.__check_created();
+
+		entity_npc_infos.SetArray(this.__idx, this, sizeof(EntityNPCInfo));
+	}
+}
+
+bool get_npc_info(int entity, EntityNPCInfo info)
+{
+	int ref = EntIndexToEntRef(entity);
+	int idx = entity_npc_infos.FindValue(ref, EntityNPCInfo::ref);
+	if(idx != -1) {
+		entity_npc_infos.GetArray(idx, info, sizeof(EntityNPCInfo));
+		info.__idx = idx;
+		return true;
+	} else {
+		info.ref = ref;
+		info.__idx = -1;
+		info.__enemy_sentry_ref = INVALID_ENT_REFERENCE;
+		return false;
+	}
+}
+
+void set_npc_info(int entity, EntityNPCInfo info)
+{
+	int ref = EntIndexToEntRef(entity);
+	int idx = entity_npc_infos.FindValue(ref, EntityNPCInfo::ref);
+	if(idx != -1) {
+		entity_npc_infos.SetArray(idx, info, sizeof(EntityNPCInfo));
+		info.__idx = idx;
+	} else {
+		info.created();
+		idx = entity_npc_infos.PushArray(info, sizeof(EntityNPCInfo));
+		info.__idx = idx;
+	}
+}
+
+ConVar sm_npcs_dead_decoration_time;
+
+#include "sm_npcs/behavior/retreat_to_cover/action.sp"
+#include "sm_npcs/behavior/attack/action.sp"
+#include "sm_npcs/behavior/seek_and_destroy/action.sp"
+#include "sm_npcs/behavior/monitor/action.sp"
+#include "sm_npcs/behavior/dead/action.sp"
+#include "sm_npcs/behavior/main/action.sp"
 
 static GlobalForward fwd_behaviors_created;
 
 public void OnPluginStart()
 {
+	tf_bot_notice_backstab_max_range = FindConVar("tf_bot_notice_backstab_max_range");
+	tf_bot_notice_backstab_min_range = FindConVar("tf_bot_notice_backstab_min_range");
+	tf_bot_notice_backstab_chance = FindConVar("tf_bot_notice_backstab_chance");
+	tf_bot_wait_in_cover_min_time = FindConVar("tf_bot_wait_in_cover_min_time");
+	tf_bot_wait_in_cover_max_time = FindConVar("tf_bot_wait_in_cover_max_time");
+	tf_bot_retreat_to_cover_range = FindConVar("tf_bot_retreat_to_cover_range");
+	tf_nav_in_combat_range = FindConVar("tf_nav_in_combat_range");
+
+	sm_npcs_dead_decoration_time = CreateConVar("sm_npcs_dead_decoration_time", "15.0");
+
 	sm_npcs_debug_pathing = CreateConVar("sm_npcs_debug_pathing", "0");
 
-	basic_melee_action_init();
-	basic_range_action_init();
-	play_anim_action_init();
+	entity_npc_infos = new ArrayList(sizeof(EntityNPCInfo));
+
+	retreat_to_cover_action_init();
+	seek_and_destroy_action_init();
+	attack_action_init();
+	monitor_action_init();
+	dead_action_init();
+	main_action_init();
 }
 
 public void OnAllPluginsLoaded()
@@ -108,6 +289,86 @@ public void OnMapStart()
 
 	g_sModelIndexBloodSpray = PrecacheModel("sprites/bloodspray.vmt");
 	g_sModelIndexBloodDrop = PrecacheModel("sprites/blood.vmt");
+
+	if(late_loaded) {
+		int entity = -1;
+		char classname[64];
+		while((entity = FindEntityByClassname(entity, "*")) != -1) {
+			GetEntityClassname(entity, classname, sizeof(classname));
+			OnEntityCreated(entity, classname);
+
+			if(late_loaded) {
+				if(StrContains(classname, "trigger_") != -1) {
+					trigger_spawn(entity);
+				}
+			}
+		}
+	}
+}
+
+#define SF_TRIGGER_ALLOW_CLIENTS 0x1
+#define SF_TRIGGER_ALLOW_NPCS 0x2
+
+static void trigger_spawn(int entity)
+{
+	int spawnflags = GetEntProp(entity, Prop_Data, "m_spawnflags");
+	if(spawnflags & SF_TRIGGER_ALLOW_CLIENTS) {
+		spawnflags |= SF_TRIGGER_ALLOW_NPCS;
+		SetEntProp(entity, Prop_Data, "m_spawnflags", spawnflags);
+	}
+}
+
+public void OnEntityCreated(int entity, const char[] classname)
+{
+	if(StrContains(classname, "trigger_") != -1) {
+		SDKHook(entity, SDKHook_SpawnPost, trigger_spawn);
+	}
+}
+
+public void OnEntityDestroyed(int entity)
+{
+	if(entity == -1) {
+		return;
+	}
+
+	if(entity & (1 << 31)) {
+		entity = EntRefToEntIndex(entity);
+	}
+
+	int idx = entity_npc_infos.FindValue(EntIndexToEntRef(entity), EntityNPCInfo::ref);
+	if(idx != -1) {
+		EntityNPCInfo info;
+		entity_npc_infos.GetArray(idx, info, sizeof(EntityNPCInfo));
+		info.destroyed();
+		entity_npc_infos.Erase(idx);
+	}
+}
+
+static any native_weapon_fired(Handle plugin, int params)
+{
+	int entity = GetNativeCell(1);
+
+	EntityNPCInfo info;
+	get_npc_info(entity, info);
+
+	if(info.get_next_combat_time() > GetGameTime()) {
+		return 0;
+	}
+
+	CNavArea start_area = GetEntityLastKnownArea(entity);
+
+	ArrayList areas = new ArrayList();
+	CollectSurroundingAreas(areas, start_area, tf_nav_in_combat_range.FloatValue, STEP_HEIGHT, STEP_HEIGHT);
+	int len = areas.Length;
+	for(int i = 0; i < len; ++i) {
+		CTFNavArea area = areas.Get(i);
+		area.OnCombat();
+	}
+	delete areas;
+
+	info.set_next_combat_time(GetGameTime() + 1.0);
+
+	return 0;
 }
 
 static any native_TE_SetupBloodSprite2Ex(Handle plugin, int params)
@@ -142,12 +403,16 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("npc_resolve_collisions", native_npc_resolve_collisions);
 	CreateNative("handle_playbackrate", native_handle_playbackrate);
 	CreateNative("handle_move_yaw", native_handle_move_yaw);
+	CreateNative("handle_move_xy", native_handle_move_xy);
 	CreateNative("npc_hull_debug", native_npc_hull_debug);
 	CreateNative("get_behavior_action", native_get_behavior_action);
 	CreateNative("find_particle", native_find_particle);
 	CreateNative("TE_SetupBloodSprite2Ex", native_TE_SetupBloodSprite2Ex);
+	CreateNative("weapon_fired", native_weapon_fired);
 
 	RegPluginLibrary("sm_npcs");
+
+	late_loaded = late;
 
 	return APLRes_Success;
 }
@@ -159,15 +424,11 @@ static any native_get_behavior_action(Handle plugin, int params)
 	char[] name = new char[++len];
 	GetNativeString(1, name, len);
 
-	if(StrEqual(name, "BasicMelee")) {
-		return basic_melee_action;
-	} else if(StrEqual(name, "BasicRange")) {
-		return basic_range_action;
-	} else if(StrEqual(name, "PlayAnim")) {
-		return play_anim_action;
+	if(StrEqual(name, "Main")) {
+		return main_action;
+	} else {
+		return ThrowNativeError(SP_ERROR_NATIVE, "no action named '%s'", name);
 	}
-
-	return 0;
 }
 
 static any native_find_particle(Handle plugin, int params)
@@ -370,6 +631,32 @@ static any native_handle_move_yaw(Handle plugin, int params)
 	return 0;
 }
 
+static any native_handle_move_xy(Handle plugin, int params)
+{
+	int entity = GetNativeCell(1);
+	int xpose = GetNativeCell(2);
+	int ypose = GetNativeCell(3);
+	ILocomotion locomotion = GetNativeCell(4);
+
+	float ang[3];
+	GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
+
+	float fwd[3];
+	float right[3];
+	GetAngleVectors(ang, fwd, right, NULL_VECTOR);
+
+	float velocity[3];
+	locomotion.GetGroundMotionVector(velocity);
+
+	float x = GetVectorDotProduct(right, velocity);
+	float y = GetVectorDotProduct(fwd, velocity);
+
+	AnimatingSetPoseParameter(entity, xpose, x);
+	AnimatingSetPoseParameter(entity, ypose, y);
+
+	return 0;
+}
+
 static any native_handle_playbackrate(Handle plugin, int params)
 {
 	int entity = GetNativeCell(1);
@@ -443,6 +730,9 @@ static any native_npc_hull_debug(Handle plugin, int params)
 		float maxs[3];
 		body.GetHullMaxs(maxs);
 
+		float eye[3];
+		body.GetEyePosition(eye);
+
 		NDebugOverlay_BoxAngles(pos, mins, maxs, ang, 255, 0, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 
 		GetEntPropVector(entity, Prop_Data, "m_vecMins", mins);
@@ -472,6 +762,12 @@ static any native_npc_hull_debug(Handle plugin, int params)
 		end[2] += body.HullHeight;
 
 		NDebugOverlay_Line(pos, end, 0, 0, 255, false, NDEBUG_PERSIST_TILL_NEXT_SERVER);
+
+		end[0] = eye[0];
+		end[1] = eye[1];
+		end[2] = eye[2];
+
+		NDebugOverlay_Line(pos, end, 0, 255, 0, false, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 	}
 
 	return 0;
@@ -481,6 +777,10 @@ static any native_npc_resolve_collisions(Handle plugin, int params)
 {
 	INextBot bot = GetNativeCell(1);
 	int entity = GetNativeCell(2);
+
+	if(!entity_is_alive(entity)) {
+		return 0;
+	}
 
 	float npc_pos[3];
 	bot.GetPosition(npc_pos);
@@ -507,6 +807,10 @@ static any native_npc_resolve_collisions(Handle plugin, int params)
 			IsClientReplay(i) ||
 			GetClientTeam(i) < 2 ||
 			TF2_GetPlayerClass(i) == TFClass_Unknown) {
+			continue;
+		}
+
+		if(GetEntityMoveType(i) == MOVETYPE_NOCLIP) {
 			continue;
 		}
 
@@ -659,7 +963,24 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 	body_custom.set_data("walk_anim_speed", walk_speed);
 	body_custom.set_data("run_anim_speed", run_speed);
 
-	set_npc_hull(body_custom, entity);
+	float mins[3];
+	GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+
+	float maxs[3];
+	GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+
+	float width = maxs[1] > mins[1] ? maxs[1] : mins[1];
+	float height = maxs[2];
+
+	body_custom.HullWidth = width;
+
+	body_custom.CrouchHullHeight = height;
+	body_custom.StandHullHeight = height;
+	body_custom.LieHullHeight = height;
+
+	float view[3];
+	view[2] = height;
+	SetEntPropVector(entity, Prop_Data, "m_vecViewOffset", view);
 
 	if(health == 0) {
 		SetEntProp(entity, Prop_Data, "m_takedamage", DAMAGE_NO);
@@ -678,9 +999,11 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 		SetEntProp(entity, Prop_Data, "m_iMaxHealth", health);
 	}
 
+	bool mvm = IsMannVsMachineMode();
+
 	int initialteam = GetEntProp(entity, Prop_Data, "m_iInitialTeamNum");
 	if(initialteam == TEAM_UNASSIGNED) {
-		if(IsMannVsMachineMode()) {
+		if(mvm) {
 			TeamManager_SetEntityTeam(entity, TF_TEAM_PVE_INVADERS, false);
 		} else {
 			TeamManager_SetEntityTeam(entity, TF_TEAM_HALLOWEEN, false);
@@ -690,7 +1013,7 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 	}
 
 	int team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
-	if((team == TF_TEAM_PVE_INVADERS || team == TF_TEAM_PVE_INVADERS_GIANTS) && IsMannVsMachineMode()) {
+	if((team == TF_TEAM_PVE_INVADERS || team == TF_TEAM_PVE_INVADERS_GIANTS) && mvm) {
 		//TODO!!!!! move this elsewhere
 		custom_locomotion.set_function("ShouldCollideWith", npc_loc_collide);
 	}
@@ -735,25 +1058,4 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 	}
 
 	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
-}
-
-void set_npc_hull(IBodyCustom body_custom, int entity)
-{
-	float mins[3];
-	GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
-
-	float maxs[3];
-	GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
-
-	float width = maxs[1] > mins[1] ? maxs[1] : mins[1];
-	float height = maxs[2];
-
-	width += 1.0;
-	height += 1.0;
-
-	body_custom.HullWidth = width;
-
-	body_custom.CrouchHullHeight = height;
-	body_custom.StandHullHeight = height;
-	body_custom.LieHullHeight = height;
 }

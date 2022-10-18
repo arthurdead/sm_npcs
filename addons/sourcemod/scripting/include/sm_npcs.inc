@@ -29,6 +29,7 @@
 #define DAMAGE_NO 0
 #define DAMAGE_YES 2
 #define DAMAGE_EVENTS_ONLY 1
+#define LIFE_DEAD 2
 #define LIFE_ALIVE 0
 
 #define EFL_KILLME (1 << 0)
@@ -67,6 +68,8 @@ native bool npc_pop_spawn_single(const char[] classname, CustomPopulationSpawner
 native void ground_npc_spawn(INextBot bot, int entity, int health, float walk_speed, float run_speed);
 native void flying_npc_spawn(INextBot bot, int entity, int health, float altitude, float acceleration);
 
+native void weapon_fired(int entity);
+
 native void TE_SetupBloodSprite2Ex(const float pos[3], const float dir[3], const int color[4], int Size);
 
 stock void TE_SetupBloodSprite2(const float pos[3], const float dir[3], int color, int Size)
@@ -101,6 +104,7 @@ stock void TE_SetupBloodSprite2(const float pos[3], const float dir[3], int colo
 native void npc_resolve_collisions(INextBot bot, int entity);
 native void handle_playbackrate(int entity, ILocomotion locomotion, IBody body);
 native void handle_move_yaw(int entity, int pose, ILocomotion locomotion);
+native void handle_move_xy(int entity, int xpose, int ypose, ILocomotion locomotion);
 
 native void npc_hull_debug(INextBot bot, IBody body, ILocomotion locomotion, int entity);
 
@@ -139,12 +143,48 @@ stock int create_bonemerge_model(int owner, const char[] model, const char[] att
 	return merge;
 }
 
+stock bool entity_is_alive(int entity)
+{
+	if(GetEntProp(entity, Prop_Data, "m_iEFlags") & EFL_KILLME) {
+		return false;
+	}
+
+	if(GetEntProp(entity, Prop_Data, "m_lifeState") != LIFE_ALIVE) {
+		return false;
+	}
+
+	if(GetEntProp(entity, Prop_Data, "m_iHealth") <= 0) {
+		return false;
+	}
+
+	return true;
+}
+
+stock bool entity_is_invunerable(int victim)
+{
+	if(victim >= 1 && victim <= MaxClients) {
+		if(TF2_IsPlayerInCondition(victim, TFCond_Ubercharged) ||
+			TF2_IsPlayerInCondition(victim, TFCond_UberchargedHidden) ||
+			TF2_IsPlayerInCondition(victim, TFCond_UberchargedCanteen) ||
+			TF2_IsPlayerInCondition(victim, TFCond_UberchargedOnTakeDamage)) {
+			return true;
+		}
+	}
+
+	if(GetEntProp(victim, Prop_Data, "m_takedamage") != DAMAGE_YES) {
+		return true;
+	}
+
+	return false;
+}
+
 stock bool entity_is_damageable(int victim, bool ignore_uber)
 {
-	if(GetEntProp(victim, Prop_Data, "m_takedamage") == DAMAGE_NO ||
-		GetEntProp(victim, Prop_Data, "m_lifeState") != LIFE_ALIVE ||
-		GetEntProp(victim, Prop_Data, "m_iEFlags") & EFL_KILLME ||
-		GetEntityFlags(victim) & FL_NOTARGET) {
+	if(!entity_is_alive(victim)) {
+		return false;
+	}
+
+	if(GetEntityFlags(victim) & FL_NOTARGET) {
 		return false;
 	}
 
@@ -158,14 +198,11 @@ stock bool entity_is_damageable(int victim, bool ignore_uber)
 		if(TF2_IsPlayerInCondition(victim, TFCond_HalloweenGhostMode)) {
 			return false;
 		}
+	}
 
-		if(!ignore_uber) {
-			if(TF2_IsPlayerInCondition(victim, TFCond_Ubercharged) ||
-				TF2_IsPlayerInCondition(victim, TFCond_UberchargedHidden) ||
-				TF2_IsPlayerInCondition(victim, TFCond_UberchargedCanteen) ||
-				TF2_IsPlayerInCondition(victim, TFCond_UberchargedOnTakeDamage)) {
-				return false;
-			}
+	if(!ignore_uber) {
+		if(entity_is_invunerable(victim)) {
+			return false;
 		}
 	}
 
