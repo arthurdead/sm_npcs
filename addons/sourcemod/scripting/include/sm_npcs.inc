@@ -101,10 +101,34 @@ stock void TE_SetupBloodSprite2(const float pos[3], const float dir[3], int colo
 	TE_SetupBloodSprite2Ex(pos, dir, rgba, Size);
 }
 
-native void npc_resolve_collisions(INextBot bot, int entity);
+stock float fmodf(float number, float denom)
+{
+	return (number - float(RoundToFloor(number / denom)) * denom);
+}
+
+stock float AngleNormalize(float angle)
+{
+	angle = fmodf(angle, 360.0);
+	if(angle > 180.0) {
+		angle -= 360.0;
+	}
+
+	if(angle < -180.0) {
+		angle += 360.0;
+	}
+
+	return angle;
+}
+
+stock float AngleDiff(float destAngle, float srcAngle)
+{
+	return AngleNormalize(destAngle - srcAngle);
+}
+
 native void handle_playbackrate(int entity, ILocomotion locomotion, IBody body);
 native void handle_move_yaw(int entity, int pose, ILocomotion locomotion);
 native void handle_move_xy(int entity, int xpose, int ypose, ILocomotion locomotion);
+native void handle_aim_xy(int entity, int xpose, int ypose, IBodyCustom body_custom);
 
 native void npc_hull_debug(INextBot bot, IBody body, ILocomotion locomotion, int entity);
 
@@ -118,6 +142,28 @@ stock void SetEntityModelScale(int entity, float scale)
 	AcceptEntityInput(entity, "SetModelScale");
 }
 
+stock int create_attach_entity(int owner, const char[] classname, const char[] attach)
+{
+	int merge = CreateEntityByName(classname);
+	int team = GetEntProp(owner, Prop_Send, "m_iTeamNum");
+	SetEntProp(merge, Prop_Data, "m_iInitialTeamNum", team);
+	SetEntityOwner(merge, owner);
+	DispatchSpawn(merge);
+	ActivateEntity(merge);
+	SetEntityOwner(merge, owner);
+	SetEntProp(merge, Prop_Send, "m_iTeamNum", team);
+	SetVariantString("!activator");
+	AcceptEntityInput(merge, "SetParent", owner);
+	int effects = GetEntProp(merge, Prop_Send, "m_fEffects");
+	effects |= EF_PARENT_ANIMATES;
+	SetEntProp(merge, Prop_Send, "m_fEffects", effects);
+	if(!IsNullString(attach) && attach[0] != '\0') {
+		SetVariantString(attach);
+		AcceptEntityInput(merge, "SetParentAttachment");
+	}
+	return merge;
+}
+
 stock int create_attach_model(int owner, const char[] model, const char[] attach)
 {
 	int merge = CreateEntityByName("prop_dynamic_override");
@@ -129,8 +175,10 @@ stock int create_attach_model(int owner, const char[] model, const char[] attach
 	int effects = GetEntProp(merge, Prop_Send, "m_fEffects");
 	effects |= EF_PARENT_ANIMATES;
 	SetEntProp(merge, Prop_Send, "m_fEffects", effects);
-	SetVariantString(attach)
-	AcceptEntityInput(merge, "SetParentAttachment");
+	if(!IsNullString(attach) && attach[0] != '\0') {
+		SetVariantString(attach);
+		AcceptEntityInput(merge, "SetParentAttachment");
+	}
 	return merge;
 }
 
@@ -209,20 +257,11 @@ stock bool entity_is_damageable(int victim, bool ignore_uber)
 	return true;
 }
 
-//BasicMelee.handle_swing
-typedef handle_swing_func_t = function void (int entity);
+//IIntentionCustom.handle_fire
+typedef handle_fire_func_t = function void (IIntentionCustom intention, INextBot bot, int entity, int victim, float sight_pos[3]);
 
-//BasicMelee.handle_idle
-typedef handle_idle_func_t = function void (int entity);
-
-//*.handle_die
-typedef handle_die_func_t = function bool (int entity);
-
-//BasicRange.handle_fire
-typedef handle_fire_func_t = function void (CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3]);
-
-//PlayAnim.setup_next_action
-typedef setup_next_action_func_t = function void (CustomBehaviorAction action);
+//IIntentionCustom.handle_die
+typedef handle_die_func_t = function void (IIntentionCustom intention, INextBot bot, int entity, bool start);
 
 native CustomBehaviorActionEntry get_behavior_action(const char[] name);
 
@@ -230,37 +269,7 @@ forward void basic_behaviors_created();
 
 typedef npc_datamap_init_func_t = function void (CustomDatamap datamap);
 
-stock void create_npc_factories(const char[] classname, const char[] name, npc_datamap_init_func_t dtm_func)
-{
-	char tmp_classname[64];
-	strcopy(tmp_classname, sizeof(tmp_classname), classname);
-	int len = strlen(classname);
-
-	CustomDatamap datamap = register_nextbot_factory(tmp_classname, name);
-	if(dtm_func != INVALID_FUNCTION) {
-		Call_StartFunction(null, dtm_func);
-		Call_PushCell(datamap);
-		Call_Finish();
-	}
-
-	tmp_classname[len] = '\0';
-	StrCat(tmp_classname, sizeof(tmp_classname), "_robothealthbar");
-	datamap = register_robot_nextbot_factory(tmp_classname, name);
-	if(dtm_func != INVALID_FUNCTION) {
-		Call_StartFunction(null, dtm_func);
-		Call_PushCell(datamap);
-		Call_Finish();
-	}
-
-	tmp_classname[len] = '\0';
-	StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
-	datamap = register_tankboss_nextbot_factory(tmp_classname, name);
-	if(dtm_func != INVALID_FUNCTION) {
-		Call_StartFunction(null, dtm_func);
-		Call_PushCell(datamap);
-		Call_Finish();
-	}
-}
+native void create_npc_factories(const char[] classname, const char[] name, npc_datamap_init_func_t dtm_func);
 
 stock void remove_entities_of_classname(const char[] classname)
 {

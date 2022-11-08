@@ -1,6 +1,6 @@
-static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3])
+static void handle_fire(IIntentionCustom intention, INextBot bot, int entity, int victim, const float sight_pos[3])
 {
-	float attack_time = action.get_data("attack_time");
+	float attack_time = intention.get_data("attack_time");
 	if(attack_time < GetGameTime()) {
 		int weapon = GetEntPropEnt(entity, Prop_Data, "m_hWeaponModel");
 		if(weapon == -1) {
@@ -22,7 +22,7 @@ static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, i
 		bullets.m_pAttacker = entity;
 		bullets.m_iTracerFreq = 1;
 
-		bullets.m_flDamage = sk_tf2i_alien_commando_dmg.FloatValue;
+		bullets.m_flDamage = sk_tfi_alien_commando_dmg.FloatValue;
 		bullets.m_iPlayerDamage = RoundToFloor(bullets.m_flDamage);
 
 		strcopy(bullets.tracer_name, MAX_TRACER_NAME, "dxhr_sniper_rail_blue");
@@ -34,25 +34,26 @@ static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, i
 
 		EmitGameSoundToAll("Weapon_ShootingStar.SingleCharged", weapon);
 
-		action.set_data("attack_time", GetGameTime() + 1.0);
+		intention.set_data("attack_time", GetGameTime() + 1.0);
 	}
 }
 
-static bool handle_die(int entity)
+static void handle_die(IIntentionCustom intention, INextBot bot, int entity, bool start)
 {
 	int weapon = GetEntPropEnt(entity, Prop_Data, "m_hWeaponModel");
 	if(weapon != -1) {
 		RemoveEntity(weapon);
 		SetEntPropEnt(entity, Prop_Data, "m_hWeaponModel", -1);
 	}
-
-	return true;
 }
 
-BehaviorAction tf2i_alien_commando_behavior(int entity)
+BehaviorAction tfi_alien_commando_behavior(IIntentionCustom intention, INextBot bot, int entity)
 {
-	CustomBehaviorAction action = basic_range_action.create();
-	action.set_function("handle_fire", handle_fire);
-	action.set_function("handle_die", handle_die);
+	intention.set_function("handle_fire", handle_fire);
+	intention.set_function("handle_die", handle_die);
+
+	intention.set_data("attack_time", GetGameTime());
+
+	CustomBehaviorAction action = main_action.create();
 	return action;
 }

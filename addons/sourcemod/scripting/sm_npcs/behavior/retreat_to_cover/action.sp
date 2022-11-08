@@ -4,6 +4,7 @@ void retreat_to_cover_action_init()
 {
 	retreat_to_cover_action = new CustomBehaviorActionEntry("RetreatToCover");
 	retreat_to_cover_action.set_function("OnStart", action_start);
+	retreat_to_cover_action.set_function("OnEnd", action_end);
 	retreat_to_cover_action.set_function("Update", action_update);
 	retreat_to_cover_action.set_function("OnStuck", action_stuck);
 	retreat_to_cover_action.set_function("OnMoveToSuccess", action_movesuccess);
@@ -120,21 +121,29 @@ static CNavArea find_cover_area(INextBot bot, int entity)
 	return coverArea;
 }
 
+static void action_end(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction next)
+{
+	PathFollower path = action.get_data("m_path");
+	delete path;
+}
+
 static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot, int entity, BehaviorAction prior, BehaviorResult result)
 {
 	if(action.has_data("m_actionToChangeToOnceCoverReached")) {
 		action.set_data("m_hideDuration", -1.0);
 	} else if(action.has_data("m_hideDuration")) {
-		action.set_data("m_actionToChangeToOnceCoverReached", 0);
+		action.set_data("m_actionToChangeToOnceCoverReached", BehaviorAction_Null);
 	} else {
 		action.set_data("m_hideDuration", -1.0);
-		action.set_data("m_actionToChangeToOnceCoverReached", 0);
+		action.set_data("m_actionToChangeToOnceCoverReached", BehaviorAction_Null);
 	}
 
 	CNavArea coverArea = find_cover_area(bot, entity);
 	action.set_data("m_coverArea", coverArea);
 
 	if(coverArea == CNavArea_Null) {
+		action.set_data("m_path", INVALID_HANDLE);
+
 		return result.Done("No cover available!");
 	}
 
@@ -147,6 +156,10 @@ static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot
 	action.set_data("m_waitInCoverTimer", GetGameTime() + hideDuration);
 
 	action.set_data("m_repathTimer", GetGameTime());
+
+	PathFollower path = new PathFollower();
+	path.MinLookAheadDistance = GetDesiredPathLookAheadRange(entity);
+	action.set_data("m_path", path);
 
 	return result.Continue();
 }

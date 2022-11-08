@@ -7,9 +7,7 @@
 
 CustomBehaviorActionEntry main_action;
 
-#include "npcs_fortified/drone/npc.sp"
-#include "npcs_fortified/distruptor/npc.sp"
-#include "npcs_fortified/barricade/npc.sp"
+#include "npcs_tf_invasion_game/alien_commando/npc.sp"
 
 static bool late_loaded;
 
@@ -21,9 +19,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	fortified_drone_init();
-	fortified_distruptor_init();
-	fortified_barricade_init();
+	tfi_alien_commando_init();
 }
 
 public void OnAllPluginsLoaded()
@@ -42,26 +38,20 @@ public void OnMapStart()
 {
 	int entity = CreateEntityByName("prop_dynamic_override");
 
-	fortified_drone_precache(entity);
-	fortified_distruptor_precache(entity);
-	fortified_barricade_precache(entity);
+	tfi_alien_commando_precache(entity);
 
 	RemoveEntity(entity);
 }
 
 public void OnPluginEnd()
 {
-	remove_entities_of_classname("npc_fortified_*");
+	remove_entities_of_classname("npc_tfi_*");
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	if(StrContains(classname, "npc_fortified_drone") != -1) {
-		fortified_drone_created(entity);
-	} else if(StrContains(classname, "npc_fortified_distruptor") != -1) {
-		fortified_distruptor_created(entity);
-	} else if(StrContains(classname, "npc_fortified_barricade") != -1) {
-		fortified_barricade_created(entity);
+	if(StrContains(classname, "npc_tfi_alien_commando") != -1) {
+		tfi_alien_commando_created(entity);
 	}
 }
 
@@ -74,7 +64,7 @@ public void OnEntityDestroyed(int entity)
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
-	if(StrContains(classname, "npc_fortified_barricade") != -1) {
-		fortified_barricade_destroyed(entity);
+	if(StrContains(classname, "npc_tfi_alien_commando") != -1) {
+		tfi_alien_commando_destroyed(entity);
 	}
 }

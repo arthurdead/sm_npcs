@@ -118,7 +118,13 @@ static CKnownEntity select_closer_threat(INextBot bot, CKnownEntity threat1, CKn
 
 static CKnownEntity action_treat(CustomBehaviorAction action, INextBot bot, int entity, int subject, CKnownEntity threat1, CKnownEntity threat2)
 {
+	IIntentionCustom intention_custom = view_as<IIntentionCustom>(bot.IntentionInterface);
+
 	CKnownEntity closerThreat = select_closer_threat(bot, threat1, threat2);
+
+	if(intention_custom.has_data("melee_only")) {
+		return closerThreat;
+	}
 
 	bool isImmediateThreat1 = is_immediate_threat(bot, entity, threat1);
 	bool isImmediateThreat2 = is_immediate_threat(bot, entity, threat2);
@@ -149,6 +155,7 @@ static CKnownEntity action_treat(CustomBehaviorAction action, INextBot bot, int 
 
 enum struct RetreatInfluenceInfo
 {
+	int entity;
 	INextBot bot;
 	float m_friendScore;
 	float m_foeScore;
@@ -198,6 +205,29 @@ static float get_threat_danger(int entity)
 	return 0.0;
 }
 
+static bool IsFacingWithinTolerance(int entity, const float target_pos[3], float tolerance)
+{
+	float my_pos[3];
+	EntityGetAbsOrigin(entity, my_pos);
+
+	float ang[3];
+	GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
+
+	float fwd[3];
+	GetAngleVectors(ang, fwd, NULL_VECTOR, NULL_VECTOR);
+
+	float dir[3];
+	SubtractVectors(my_pos, target_pos, dir);
+	NormalizeVector(dir, dir);
+
+	float dot = GetVectorDotProduct(dir, fwd);
+	if(dot >= tolerance) {
+		return true;
+	}
+
+	return false;
+}
+
 static bool retreat_influence(CKnownEntity known, any data)
 {
 	int entity = known.Entity;
@@ -212,12 +242,12 @@ static bool retreat_influence(CKnownEntity known, any data)
 					return true;
 				}
 
-				//TODO!!!
-			#if 0
-				if(UTIL_IsFacingWithinTolerance(entity, m_me->EyePosition(), 0.5)) {
+				float eye[3];
+				EntityEyePosition(retreat_influence_info.entity, eye);
+
+				if(IsFacingWithinTolerance(entity, eye, 0.5)) {
 					retreat_influence_info.m_foeScore += get_threat_danger(entity);
 				}
-			#endif
 			}
 		}
 	}
@@ -229,6 +259,7 @@ static QueryResultType action_retreat(CustomBehaviorAction action, INextBot bot,
 {
 	IVision vision = bot.VisionInterface;
 
+	retreat_influence_info.entity = entity;
 	retreat_influence_info.bot = bot;
 	retreat_influence_info.m_friendScore = 0.0;
 	retreat_influence_info.m_foeScore = 0.0;
@@ -243,11 +274,15 @@ static QueryResultType action_retreat(CustomBehaviorAction action, INextBot bot,
 
 static QueryResultType action_hurry(CustomBehaviorAction action, INextBot bot, int entity)
 {
+	//TODO!!!! CanBotsAttackWhileInSpawnRoom
+
 	return ANSWER_UNDEFINED;
 }
 
 static QueryResultType action_attack(CustomBehaviorAction action, INextBot bot, int entity, CKnownEntity them)
 {
+	//TODO!!!! CanBotsAttackWhileInSpawnRoom
+
 	return ANSWER_YES;
 }
 
@@ -310,8 +345,221 @@ static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot
 	return result.Continue();
 }
 
+static void update_looking_around_for_enemies(INextBot bot, int entity, IVision vision, IBody body)
+{
+	const float maxLookInterval = 1.0;
+
+	CKnownEntity known = vision.GetPrimaryKnownThreat();
+	if(known != CKnownEntity_Null) {
+		int known_entity = known.Entity;
+
+		if(known.VisibleInFOVNow) {
+			body.AimHeadTowardsEnt(known_entity, CRITICAL, 1.0, INextBotReply_Null, "Aiming at a visible threat");
+			return;
+		}
+
+		if(CombatCharacterIsLineOfSightClearEnt(entity, known_entity, IGNORE_ACTORS)) {
+			float knowPos[3];
+			EntityGetAbsOrigin(known_entity, knowPos);
+
+			float myPos[3];
+			bot.GetPosition(myPos);
+
+			float toThreat[3];
+			SubtractVectors(knowPos, myPos, toThreat);
+
+			float threatRange = NormalizeVector(toThreat, toThreat);
+
+			float aimError = FLOAT_PI/6.0;
+
+			float s = Sine(aimError);
+			float c = Cosine(aimError);
+
+			float error = threatRange * s;
+
+			float imperfectAimSpot[3];
+			EntityWorldSpaceCenter(known_entity, imperfectAimSpot);
+
+			imperfectAimSpot[0] += GetRandomFloat( -error, error );
+			imperfectAimSpot[1] += GetRandomFloat( -error, error );
+
+			body.AimHeadTowardsVec(imperfectAimSpot, IMPORTANT, 1.0, INextBotReply_Null, "Turning around to find threat out of our FOV");
+			return;
+		}
+
+		//TODO!!!!!!
+	#if 0
+		CNavArea myArea = GetEntityLastKnownArea(entity);
+		if(myArea != CNavArea_Null) {
+			const CTFNavArea *closeArea = NULL;
+			CFindClosestPotentiallyVisibleAreaToPos find( known->GetLastKnownPosition() );
+			myArea->ForAllPotentiallyVisibleAreas( find );
+
+			closeArea = find.m_closeArea;
+
+			if ( closeArea )
+			{
+				// try to not look directly at walls
+				const int retryCount = 10.0f;
+				for( int r=0; r<retryCount; ++r )
+				{
+					Vector gazeSpot = closeArea->GetRandomPoint() + Vector( 0, 0, 0.75f * HumanHeight );
+
+					if ( GetVisionInterface()->IsLineOfSightClear( gazeSpot ) )
+					{
+						// use maxLookInterval so these looks override body aiming from path following
+						GetBodyInterface()->AimHeadTowards( gazeSpot, IBody::IMPORTANT, maxLookInterval, NULL, "Looking toward potentially visible area near known but hidden threat" );
+						return;
+					}
+				}					
+
+				// can't find a clear line to look along
+				if ( IsDebugging( NEXTBOT_VISION | NEXTBOT_ERRORS ) )
+				{
+					ConColorMsg( Color( 255, 255, 0, 255 ), "%3.2f: %s can't find clear line to look at potentially visible near known but hidden entity %s(#%d)\n", 
+									gpGlobals->curtime,
+									GetDebugIdentifier(),
+									known->GetEntity()->GetClassname(),
+									known->GetEntity()->entindex() );
+				}
+			}
+			else if ( IsDebugging( NEXTBOT_VISION | NEXTBOT_ERRORS ) )
+			{
+				ConColorMsg( Color( 255, 255, 0, 255 ), "%3.2f: %s no potentially visible area to look toward known but hidden entity %s(#%d)\n", 
+								gpGlobals->curtime,
+								GetDebugIdentifier(),
+								known->GetEntity()->GetClassname(),
+								known->GetEntity()->entindex() );
+			}
+		}
+	#endif
+
+		return;
+	}
+
+	update_looking_around_for_incoming_players(true);
+}
+
+static void update_looking_around_for_incoming_players(bool lookForEnemies)
+{
+	//TODO!!!!
+#if 0
+	if ( !m_lookAtEnemyInvasionAreasTimer.IsElapsed() )
+		return;
+
+	const float maxLookInterval = 1.0f;
+	m_lookAtEnemyInvasionAreasTimer.Start( RandomFloat( 0.333f, maxLookInterval ) );
+
+	float minGazeRange = m_Shared.InCond( TF_COND_ZOOMED ) ? 750.0f : 150.0f;
+
+	CTFNavArea *myArea = GetLastKnownArea();
+	if ( myArea )
+	{
+		int team = GetTeamNumber();
+
+		// if we want to look where teammates come from, we need to pass in
+		// the *enemy* team, since the method collects *enemy* invasion areas
+		if ( !lookForEnemies )
+		{
+			team = GetEnemyTeam( team );
+		}
+
+		const CUtlVector< CTFNavArea * > &invasionAreaVector = myArea->GetEnemyInvasionAreaVector( team );
+
+		if ( invasionAreaVector.Count() > 0 )
+		{
+			// try to not look directly at walls
+			const int retryCount = 20.0f;
+			for( int r=0; r<retryCount; ++r )
+			{
+				int which = RandomInt( 0, invasionAreaVector.Count()-1 );
+				Vector gazeSpot = invasionAreaVector[ which ]->GetRandomPoint() + Vector( 0, 0, 0.75f * HumanHeight );
+
+				if ( IsRangeGreaterThan( gazeSpot, minGazeRange ) && GetVisionInterface()->IsLineOfSightClear( gazeSpot ) )
+				{
+					// use maxLookInterval so these looks override body aiming from path following
+					GetBodyInterface()->AimHeadTowards( gazeSpot, IBody::INTERESTING, maxLookInterval, NULL, "Looking toward enemy invasion areas" );
+					break;
+				}
+			}
+		}
+	}
+#endif
+}
+
+static void fire_weapon_at_enemy(INextBot bot, int entity, IBody body, IVision vision, IIntentionCustom intention_custom)
+{
+	CKnownEntity threat = vision.GetPrimaryKnownThreat();
+	if(threat == CKnownEntity_Null || threat.Entity == -1 || !threat.VisibleRecently) {
+		return;
+	}
+
+	int threat_entity = threat.Entity;
+
+	float sight_pos[3];
+	EntityWorldSpaceCenter(threat_entity, sight_pos);
+	if(!bot.IsLineOfFireClearVec(sight_pos)) {
+		EntityEyePosition(threat_entity, sight_pos);
+		if(!bot.IsLineOfFireClearVec(sight_pos)) {
+			EntityGetAbsOrigin(threat_entity, sight_pos);
+			if(!bot.IsLineOfFireClearVec(sight_pos)) {
+				return;
+			}
+		}
+	}
+
+	if(intention_custom.ShouldAttack(bot, threat) == ANSWER_NO) {
+		return;
+	}
+
+	float my_pos[3];
+	bot.GetPosition(my_pos);
+
+	float threat_pos[3];
+	EntityGetAbsOrigin(threat_entity, threat_pos);
+
+	float to_threat[3];
+	SubtractVectors(my_pos, threat_pos, to_threat);
+
+	bool melee = intention_custom.has_data("melee_only");
+
+	float max_attack_range = 0.0;
+
+	if(melee) {
+		max_attack_range = 100.0;
+	} else {
+		max_attack_range = 9999999.0;
+	}
+
+	float threatRange = GetVectorLength(to_threat);
+	if(body.HeadAimingOnTarget && threatRange < max_attack_range) {
+		Handle pl;
+		Function func = intention_custom.get_function("handle_weapon_fire", pl);
+		if(func != INVALID_FUNCTION && pl != null) {
+			Call_StartFunction(pl, func);
+			Call_PushCell(intention_custom);
+			Call_PushCell(bot);
+			Call_PushCell(entity);
+			Call_PushCell(threat_entity);
+			Call_PushArray(sight_pos, 3);
+			Call_Finish();
+		}
+	}
+}
+
 static BehaviorResultType action_update(CustomBehaviorAction action, INextBot bot, int entity, float interval, BehaviorResult result)
 {
+	IVision vision = bot.VisionInterface;
+	IBody body = bot.BodyInterface;
+	IIntention intention = bot.IntentionInterface;
+	IIntentionCustom intention_custom = view_as<IIntentionCustom>(intention);
+
+	if(entity_is_alive(entity)) {
+		update_looking_around_for_enemies(bot, entity, vision, body);
+
+		fire_weapon_at_enemy(bot, entity, body, vision, intention_custom);
+	}
+
 	return result.Continue();
 }
 
@@ -379,9 +627,11 @@ static BehaviorResultType action_injured(CustomBehaviorAction action, INextBot b
 static BehaviorResultType action_other_killed(CustomBehaviorAction action, INextBot bot, int entity, int victim, const CTakeDamageInfo dmginfo, BehaviorResult result)
 {
 	IVision vision = bot.VisionInterface;
+	IIntentionCustom intention_custom = view_as<IIntentionCustom>(bot.IntentionInterface);
 
 	vision.ForgetEntity(victim);
 
+	int attacker = dmginfo.m_hAttacker;
 	int inflictor = dmginfo.m_hInflictor;
 
 	float victim_center[3];
@@ -406,6 +656,15 @@ static BehaviorResultType action_other_killed(CustomBehaviorAction action, INext
 				EntityGetAbsOrigin(victim, victim_pos);
 
 				npcinfo.remember_enemy_sentry(sentry, victim_pos);
+			}
+		}
+	}
+
+	if(intention_custom.has_data("can_taunt")) {
+		if(bot.IsEnemy(victim) && bot.IsSelf(attacker)) {
+			if(GetRandomFloat(0.0, 100.0) <= tf_bot_taunt_victim_chance.FloatValue) {
+				BehaviorAction next_action = taunt_action.create();
+				return result.TrySuspendFor(next_action, RESULT_IMPORTANT, "Taunting our victim");
 			}
 		}
 	}

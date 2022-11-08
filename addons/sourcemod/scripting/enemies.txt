@@ -1,0 +1,113 @@
+|||team fortress: invasion (the game not the update)
+alien commando: https://i.imgur.com/IshCFUQ.png
+common enemy
+explosive-type enemy fires rockets, grenades etc
+ranged attack
+big damage
+slow fire-rate
+medium health
+kinda slow speed
+
+|||team fortress 2: invasion (the update)
+saucer:
+common enemy
+has a constant pull effect pulling players to it
+ranged attack
+fast fire-rate
+low damage
+medium health
+very slow speed
+
+mothership:
+boss enemy
+has a constant pull effect pulling players to it
+ranged attack
+slow fire-rate
+high damage
+big health
+very-very slow speed
+
+|||psychonauts
+gmen:
+sentry-buster replacement (will not spawn normally)
+low health
+slow speed
+sapping attack
+no fire-rate
+is always invisible execpt when it saps a building then its visible for X seconds
+
+|||fortified
+drone: https://i.imgur.com/ImV0Aw1.png
+common enemy
+fast speed
+melee attack
+low damage
+melee damage has bleed functionality but visually its a electric shock
+low health
+animation dependant fire-rate
+
+distruptor: https://i.imgur.com/VxFYVnz.png
+common enemy
+ranged attack
+low health
+medium damage
+shoots the halloween lighting ball pushing enemies away
+slow fire-rate
+very-slow speed
+
+barricade: https://i.imgur.com/5OEsY1E.png
+common enemy
+very-high health
+will try to find a friend to shield https://i.imgur.com/iWmXbxn.png
+if either theres no friend to shield will resort to melee
+animation dependant fire-rate for melee
+melee attack is radius with knockback
+medium speed
+
+exterminator: https://i.imgur.com/T0HBDva.png
+common enemy
+ranged attack
+fast fire-rate
+fast speed
+low damage
+low health
+explodes on death
+
+flyingsaucer: https://i.imgur.com/CqzZ8hs.png
+i dont know
+
+invader: https://i.imgur.com/umGq9LW.png
+common enemy
+ranged attack
+fires a constant energy beam from its chest until it overheats
+then it powers down to recharge (its a animation) https://i.imgur.com/RowqFQS.png
+slow fire-rate
+slow speed
+high damage
+high health
+
+juggernaut: https://i.imgur.com/VeGB9iQ.png
+boss enemy
+melee attack
+once it takes enough damage it charges a radius attack dealing imense damage https://i.imgur.com/WoWayMq.png
+slow speed
+high health
+animation dependant fire-rate for melee
+
+stalker: https://i.imgur.com/9ZE924o.png
+boss enemy
+melee attack
+once it takes enough damage it will either do a ground pound or fire homming projectiles from its head
+slow speed
+high health
+animation dependant fire-rate for melee
+
+|||mars attacks (the movie)
+martian: https://i.imgur.com/j4M0gUR.png
+common enemy
+will taunt victims it kills https://i.imgur.com/R2xPYuQ.png
+ranged attack
+big damage
+medium fire-rate
+medium health
+medium speed

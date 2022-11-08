@@ -4,7 +4,7 @@ static ConVar npc_health_cvar;
 
 static void npc_datamap_init(CustomDatamap datamap)
 {
-	
+	datamap.add_prop("m_hShieldEntity", custom_prop_ehandle);
 }
 
 void fortified_barricade_init()
@@ -45,11 +45,10 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 
 void fortified_barricade_precache(int entity)
 {
-	PrecacheModel("models/fortified/mob/barricade/barricade.mdl");
+	PrecacheModel("models/arthurdead/fortified/mob/barricade/barricade.mdl");
+	PrecacheModel("models/props_mvm/mvm_player_shield.mdl");
 
-	//AddModelToDownloadsTable("models/fortified/mob/barricade/barricade.mdl");
-
-	SetEntityModel(entity, "models/fortified/mob/barricade/barricade.mdl");
+	//AddModelToDownloadsTable("models/arthurdead/fortified/mob/barricade/barricade.mdl");
 }
 
 void fortified_barricade_created(int entity)
@@ -62,55 +61,36 @@ static Action npc_think(int entity)
 	INextBot bot = INextBot(entity);
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
+	IBodyCustom body_custom = view_as<IBodyCustom>(body);
 
-	npc_hull_debug(bot, body, locomotion, entity);
+	//npc_hull_debug(bot, body, locomotion, entity);
 
-	npc_resolve_collisions(bot, entity);
+	int shield = GetEntPropEnt(entity, Prop_Data, "m_hShieldEntity");
 
-	handle_playbackrate(entity, locomotion, body);
+	if(entity_is_alive(entity)) {
+		handle_playbackrate(entity, locomotion, body);
 
-	return Plugin_Continue;
-}
+		body_custom.HeadAsAngles = (shield != -1);
+		body_custom.ViewAsHead = (shield != -1);
 
-static Activity npc_translate_act(IBodyCustom body, Activity act)
-{
-	switch(act) {
-		case ACT_JUMP: {
-			return ACT_INVALID;
-		}
-
-		case ACT_IDLE_AGITATED: {
-			return ACT_IDLE;
-		}
-		case ACT_IDLE_STIMULATED: {
-			return ACT_IDLE;
-		}
-		case ACT_IDLE_RELAXED: {
-			return ACT_IDLE;
-		}
-
-		case ACT_RUN_AGITATED: {
-			return ACT_WALK;
-		}
-		case ACT_RUN_STIMULATED: {
-			return ACT_WALK;
-		}
-		case ACT_RUN_RELAXED: {
-			return ACT_WALK;
-		}
-
-		case ACT_WALK_AGITATED: {
-			return ACT_WALK;
-		}
-		case ACT_WALK_STIMULATED: {
-			return ACT_WALK;
-		}
-		case ACT_WALK_RELAXED: {
-			return ACT_WALK;
+		if(shield != -1) {
+			body_custom.StartActivity(ACT_SHIELD_UP_IDLE);
+		} else {
+			if(!locomotion.OnGround ||
+				locomotion.DidJustJump) {
+				body.StartActivity(ACT_IDLE);
+			} else {
+				float ground_speed = locomotion.GroundSpeed;
+				if(ground_speed > 0.1) {
+					body.StartActivity(ACT_WALK);
+				} else {
+					body.StartActivity(ACT_IDLE);
+				}
+			}
 		}
 	}
 
-	return act;
+	return Plugin_Continue;
 }
 
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
@@ -124,21 +104,33 @@ static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 
 static void npc_spawn(int entity)
 {
-	SetEntityModel(entity, "models/fortified/mob/barricade/barricade.mdl");
+	SetEntityModel(entity, "models/arthurdead/fortified/mob/barricade/barricade.mdl");
 	SetEntityModelScale(entity, 1.0);
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
-	SetEntPropString(entity, Prop_Data, "m_iName", "Drone");
-
-	float speed = 150.0;
+	SetEntPropString(entity, Prop_Data, "m_iName", "Barricade");
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 0.1, speed);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 150.0, 150.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(fortified_barricade_behavior, "FortifiedBarricadeBehavior");
 
-	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
-	body_custom.set_function("TranslateActivity", npc_translate_act);
-
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
+
+	return;
+
+	int shield = create_attach_entity(entity, "entity_medigun_shield", NULL_STRING);
+	SetEntityNextThink(shield, TIME_NEVER_THINK, "CTFMedigunShield_ShieldThink");
+	SetEntPropVector(shield, Prop_Send, "m_angRotation", view_as<float>({0.0, 0.0, 0.0}));
+	SetEntPropVector(shield, Prop_Send, "m_vecOrigin", view_as<float>({145.0, 0.0, 0.0}));
+	SetEntProp(shield, Prop_Send, "m_nSkin", 1);
+	SetEntPropEnt(entity, Prop_Data, "m_hShieldEntity", shield);
+}
+
+void fortified_barricade_destroyed(int entity)
+{
+	int shield = GetEntPropEnt(entity, Prop_Data, "m_hShieldEntity");
+	if(shield != -1) {
+		RemoveEntity(shield);
+	}
 }

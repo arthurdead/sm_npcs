@@ -77,12 +77,7 @@ stock float get_player_class_speed(int client)
 	}
 }
 
-#define MELEE_RANGE 70.0
-#define RANGED_RANGE 1000.0
-
 static ParticleEffectNames = INVALID_STRING_TABLE;
-
-ConVar sm_npcs_debug_pathing;
 
 ConVar tf_bot_notice_backstab_max_range;
 ConVar tf_bot_notice_backstab_min_range;
@@ -90,6 +85,9 @@ ConVar tf_bot_notice_backstab_chance;
 ConVar tf_bot_wait_in_cover_min_time;
 ConVar tf_bot_wait_in_cover_max_time;
 ConVar tf_bot_retreat_to_cover_range;
+ConVar tf_populator_active_buffer_range;
+ConVar tf_bot_taunt_victim_chance;
+ConVar tf_bot_path_lookahead_range;
 static ConVar tf_nav_in_combat_range;
 
 static ArrayList entity_npc_infos;
@@ -233,11 +231,17 @@ void set_npc_info(int entity, EntityNPCInfo info)
 
 ConVar sm_npcs_dead_decoration_time;
 
+float GetDesiredPathLookAheadRange(int entity)
+{
+	return tf_bot_path_lookahead_range.FloatValue * GetEntPropFloat(entity, Prop_Send, "m_flModelScale");
+}
+
 #include "sm_npcs/behavior/retreat_to_cover/action.sp"
 #include "sm_npcs/behavior/attack/action.sp"
 #include "sm_npcs/behavior/seek_and_destroy/action.sp"
 #include "sm_npcs/behavior/monitor/action.sp"
 #include "sm_npcs/behavior/dead/action.sp"
+#include "sm_npcs/behavior/taunt/action.sp"
 #include "sm_npcs/behavior/main/action.sp"
 
 static GlobalForward fwd_behaviors_created;
@@ -250,11 +254,12 @@ public void OnPluginStart()
 	tf_bot_wait_in_cover_min_time = FindConVar("tf_bot_wait_in_cover_min_time");
 	tf_bot_wait_in_cover_max_time = FindConVar("tf_bot_wait_in_cover_max_time");
 	tf_bot_retreat_to_cover_range = FindConVar("tf_bot_retreat_to_cover_range");
+	tf_populator_active_buffer_range = FindConVar("tf_populator_active_buffer_range");
 	tf_nav_in_combat_range = FindConVar("tf_nav_in_combat_range");
+	tf_bot_taunt_victim_chance = FindConVar("tf_bot_taunt_victim_chance");
+	tf_bot_path_lookahead_range = FindConVar("tf_bot_path_lookahead_range");
 
 	sm_npcs_dead_decoration_time = CreateConVar("sm_npcs_dead_decoration_time", "15.0");
-
-	sm_npcs_debug_pathing = CreateConVar("sm_npcs_debug_pathing", "0");
 
 	entity_npc_infos = new ArrayList(sizeof(EntityNPCInfo));
 
@@ -263,6 +268,7 @@ public void OnPluginStart()
 	attack_action_init();
 	monitor_action_init();
 	dead_action_init();
+	taunt_action_init();
 	main_action_init();
 }
 
@@ -400,21 +406,104 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("npc_pop_spawn_single", native_npc_pop_spawn_single);
 	CreateNative("ground_npc_spawn", native_ground_npc_spawn);
 	CreateNative("flying_npc_spawn", native_flying_npc_spawn);
-	CreateNative("npc_resolve_collisions", native_npc_resolve_collisions);
 	CreateNative("handle_playbackrate", native_handle_playbackrate);
 	CreateNative("handle_move_yaw", native_handle_move_yaw);
 	CreateNative("handle_move_xy", native_handle_move_xy);
+	CreateNative("handle_aim_xy", native_handle_aim_xy);
 	CreateNative("npc_hull_debug", native_npc_hull_debug);
 	CreateNative("get_behavior_action", native_get_behavior_action);
 	CreateNative("find_particle", native_find_particle);
 	CreateNative("TE_SetupBloodSprite2Ex", native_TE_SetupBloodSprite2Ex);
 	CreateNative("weapon_fired", native_weapon_fired);
+	CreateNative("create_npc_factories", native_create_npc_factories);
 
 	RegPluginLibrary("sm_npcs");
 
 	late_loaded = late;
 
 	return APLRes_Success;
+}
+
+static void move_factory_handles(Handle plugin, CustomEntityFactory &old_factory, CustomDatamap &old_datamap, CustomSendtable &old_table)
+{
+	CustomEntityFactory new_factory = view_as<CustomEntityFactory>(CloneHandle(old_factory, plugin));
+	delete old_factory;
+	old_factory = new_factory;
+
+	CustomDatamap new_datamap = view_as<CustomDatamap>(CloneHandle(old_datamap, plugin));
+	delete old_datamap;
+	old_datamap = new_datamap;
+
+	CustomSendtable new_table = view_as<CustomSendtable>(CloneHandle(old_table, plugin));
+	delete old_table;
+	old_table = new_table;
+}
+
+static any native_create_npc_factories(Handle plugin, int params)
+{
+	int len;
+	GetNativeStringLength(1, len);
+	char[] classname = new char[++len];
+	GetNativeString(1, classname, len);
+
+	len = 0;
+	GetNativeStringLength(2, len);
+	char[] name = new char[++len];
+	GetNativeString(2, name, len);
+
+	char tmp_classname[64];
+	strcopy(tmp_classname, sizeof(tmp_classname), classname);
+	len = strlen(classname);
+
+	Function dtm_func = GetNativeFunction(3);
+
+	CustomSendtable table = null;
+	CustomEntityFactory factory = null;
+	CustomDatamap datamap = register_nextbot_factory(tmp_classname, name, NULL_STRING, table, factory);
+	move_factory_handles(plugin, factory, datamap, table);
+	if(dtm_func != INVALID_FUNCTION) {
+		Call_StartFunction(plugin, dtm_func);
+		Call_PushCell(datamap);
+		Call_Finish();
+	}
+
+	tmp_classname[len] = '\0';
+	StrCat(tmp_classname, sizeof(tmp_classname), "_robothealthbar");
+	table = null;
+	factory = null;
+	datamap = register_robot_nextbot_factory(tmp_classname, name, table, factory);
+	move_factory_handles(plugin, factory, datamap, table);
+	if(dtm_func != INVALID_FUNCTION) {
+		Call_StartFunction(plugin, dtm_func);
+		Call_PushCell(datamap);
+		Call_Finish();
+	}
+
+	tmp_classname[len] = '\0';
+	StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
+	table = null;
+	factory = null;
+	datamap = register_tankboss_nextbot_factory(tmp_classname, name, table, factory);
+	move_factory_handles(plugin, factory, datamap, table);
+	if(dtm_func != INVALID_FUNCTION) {
+		Call_StartFunction(plugin, dtm_func);
+		Call_PushCell(datamap);
+		Call_Finish();
+	}
+
+	tmp_classname[len] = '\0';
+	StrCat(tmp_classname, sizeof(tmp_classname), "_basenpc");
+	table = null;
+	factory = null;
+	datamap = register_basenpc_nextbot_factory(tmp_classname, name, table, factory);
+	move_factory_handles(plugin, factory, datamap, table);
+	if(dtm_func != INVALID_FUNCTION) {
+		Call_StartFunction(plugin, dtm_func);
+		Call_PushCell(datamap);
+		Call_Finish();
+	}
+
+	return 0;
 }
 
 static any native_get_behavior_action(Handle plugin, int params)
@@ -485,11 +574,14 @@ static any native_npc_pop_spawn_single(Handle plugin, int params)
 	entity_healthbar_t healthbar = entity_healthbar_none;
 	if(spawner.has_data("healthbar")) {
 		healthbar = spawner.get_data("healthbar");
+	} else {
+		healthbar = npc_healthbar_robot;
 	}
 
 	switch(healthbar) {
 		case npc_healthbar_robot: StrCat(tmp_classname, sizeof(tmp_classname), "_robothealthbar");
 		case npc_healthbar_tank: StrCat(tmp_classname, sizeof(tmp_classname), "_tankhealthbar");
+		default: StrCat(tmp_classname, sizeof(tmp_classname), "_basenpc");
 	}
 
 	int entity = CreateEntityByName(tmp_classname);
@@ -497,7 +589,7 @@ static any native_npc_pop_spawn_single(Handle plugin, int params)
 	SetEntProp(entity, Prop_Data, "m_iInitialTeamNum", TF_TEAM_PVE_INVADERS);
 	DispatchSpawn(entity);
 	ActivateEntity(entity);
-	TeamManager_SetEntityTeam(entity, TF_TEAM_PVE_INVADERS, false);
+	TeamManager_SetEntityTeam(entity, TF_TEAM_PVE_INVADERS);
 
 	if(result) {
 		result.Push(entity);
@@ -589,6 +681,13 @@ static any native_ground_npc_spawn(Handle plugin, int params)
 	float walk_speed = GetNativeCell(4);
 	float run_speed = GetNativeCell(5);
 
+	GameLocomotionCustom custom_locomotion = bot.AllocateCustomLocomotion();
+	custom_locomotion.MaxJumpHeight = 180.0;
+	custom_locomotion.DeathDropHeight = 200.0;
+	custom_locomotion.StepHeight = STEP_HEIGHT;
+	custom_locomotion.WalkSpeed = walk_speed;
+	custom_locomotion.RunSpeed = run_speed;
+
 	shared_npc_spawn(bot, entity, health, walk_speed, run_speed, false);
 	return 0;
 }
@@ -602,7 +701,17 @@ static any native_flying_npc_spawn(Handle plugin, int params)
 	float altitude = GetNativeCell(4);
 	float acceleration = GetNativeCell(5);
 
-	shared_npc_spawn(bot, entity, health, altitude, acceleration, true);
+	NextBotFlyingLocomotion custom_locomotion = bot.AllocateFlyingLocomotion();
+	custom_locomotion.MaxJumpHeight = altitude;
+	custom_locomotion.DeathDropHeight = 9999999.0;
+	custom_locomotion.TraversableSlopeLimit = 9999999.0;
+	custom_locomotion.StepHeight = altitude;
+	custom_locomotion.WalkSpeed = acceleration;
+	custom_locomotion.RunSpeed = acceleration;
+	custom_locomotion.DesiredAltitude = altitude;
+	custom_locomotion.Acceleration = acceleration;
+
+	shared_npc_spawn(bot, entity, health, acceleration, acceleration, true);
 	return 0;
 }
 
@@ -653,6 +762,29 @@ static any native_handle_move_xy(Handle plugin, int params)
 
 	AnimatingSetPoseParameter(entity, xpose, x);
 	AnimatingSetPoseParameter(entity, ypose, y);
+
+	return 0;
+}
+
+static any native_handle_aim_xy(Handle plugin, int params)
+{
+	int entity = GetNativeCell(1);
+	int xpose = GetNativeCell(2);
+	int ypose = GetNativeCell(3);
+	IBodyCustom body_custom = GetNativeCell(4);
+
+	float head_ang[3];
+	body_custom.GetHeadAngles(head_ang);
+
+	float entity_ang[3];
+	GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", entity_ang);
+
+	float yaw = AngleDiff(head_ang[1], entity_ang[1]);
+
+	AnimatingSetPoseParameter(entity, xpose, -yaw);
+	AnimatingSetPoseParameter(entity, ypose, head_ang[0]);
+
+	//TODO!!!! set entity angles when yaw > 90
 
 	return 0;
 }
@@ -722,23 +854,19 @@ static any native_npc_hull_debug(Handle plugin, int params)
 		float pos[3];
 		bot.GetPosition(pos);
 
-		float ang[3];
-		GetEntPropVector(entity, Prop_Data, "m_angAbsRotation", ang);
-
 		float mins[3];
 		body.GetHullMins(mins);
 		float maxs[3];
 		body.GetHullMaxs(maxs);
 
-		float eye[3];
-		body.GetEyePosition(eye);
+		NDebugOverlay_Box(pos, mins, maxs, 255, 0, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 
-		NDebugOverlay_BoxAngles(pos, mins, maxs, ang, 255, 0, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 
+	#if 0
 		GetEntPropVector(entity, Prop_Data, "m_vecMins", mins);
 		GetEntPropVector(entity, Prop_Data, "m_vecMaxs", maxs);
 
-		NDebugOverlay_BoxAngles(pos, mins, maxs, ang, 0, 255, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
+		NDebugOverlay_Box(pos, mins, maxs, 0, 255, 0, 255, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 
 		float end[3];
 		end[0] = pos[0];
@@ -763,220 +891,144 @@ static any native_npc_hull_debug(Handle plugin, int params)
 
 		NDebugOverlay_Line(pos, end, 0, 0, 255, false, NDEBUG_PERSIST_TILL_NEXT_SERVER);
 
+		float eye[3];
+		body.GetEyePosition(eye);
+
 		end[0] = eye[0];
 		end[1] = eye[1];
 		end[2] = eye[2];
 
 		NDebugOverlay_Line(pos, end, 0, 255, 0, false, NDEBUG_PERSIST_TILL_NEXT_SERVER);
+	#endif
 	}
 
 	return 0;
 }
 
-static any native_npc_resolve_collisions(Handle plugin, int params)
+static bool vision_noticed(GameVisionCustom vision, int subject)
 {
-	INextBot bot = GetNativeCell(1);
-	int entity = GetNativeCell(2);
+	INextBot bot = vision.Bot;
 
-	if(!entity_is_alive(entity)) {
-		return 0;
+	if((subject >= 1 && subject <= MaxClients) && bot.IsEnemy(subject)) {
+		if(TF2_IsPlayerInCondition(subject, TFCond_OnFire) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Jarated) ||
+			TF2_IsPlayerInCondition(subject, TFCond_CloakFlicker) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Bleeding)) {
+			return true;
+		}
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_StealthedUserBuffFade)) {
+			return false;
+		}
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Cloaked) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Stealthed) ||
+			TF2_IsPlayerInCondition(subject, TFCond_StealthedUserBuffFade)) {
+			/*if(player->m_Shared.GetPercentInvisible() < 0.75f) {
+				return true;
+			}*/
+
+			return false;
+		}
+
+		/*if(player->IsPlacingSapper()) {
+			return true;
+		}*/
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Disguising)) {
+			return true;
+		}
+
+		int entity = bot.Entity;
+		int my_team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Disguised) && GetEntProp(subject, Prop_Send, "m_nDisguiseTeam") == my_team) {
+			return false;
+		}
 	}
 
-	float npc_pos[3];
-	bot.GetPosition(npc_pos);
-
-	float npc_mins[3];
-	GetEntPropVector(entity, Prop_Data, "m_vecMins", npc_mins);
-
-	float npc_maxs[3];
-	GetEntPropVector(entity, Prop_Data, "m_vecMaxs", npc_maxs);
-
-	float npc_global_maxs[3];
-	AddVectors(npc_pos, npc_maxs, npc_global_maxs);
-
-	float npc_global_mins[3];
-	AddVectors(npc_pos, npc_mins, npc_global_mins);
-
-	float npc_center[3];
-	EntityWorldSpaceCenter(entity, npc_center);
-
-	for(int i = 1; i <= MaxClients; ++i) {
-		if(!IsClientInGame(i) ||
-			!IsPlayerAlive(i) ||
-			IsClientSourceTV(i) ||
-			IsClientReplay(i) ||
-			GetClientTeam(i) < 2 ||
-			TF2_GetPlayerClass(i) == TFClass_Unknown) {
-			continue;
-		}
-
-		if(GetEntityMoveType(i) == MOVETYPE_NOCLIP) {
-			continue;
-		}
-
-		float ply_pos[3];
-		GetClientAbsOrigin(i, ply_pos);
-
-		float ply_mins[3];
-		GetEntPropVector(i, Prop_Data, "m_vecMins", ply_mins);
-
-		float ply_maxs[3];
-		GetEntPropVector(i, Prop_Data, "m_vecMaxs", ply_maxs);
-
-		float plr_global_maxs[3];
-		AddVectors(ply_pos, ply_maxs, plr_global_maxs);
-
-		float plr_global_mins[3];
-		AddVectors(ply_pos, ply_mins, plr_global_mins);
-
-		if(plr_global_mins[0] > npc_global_maxs[0] ||
-			plr_global_maxs[0] < npc_global_mins[0] ||
-			plr_global_mins[1] > npc_global_maxs[1] ||
-			plr_global_maxs[1] < npc_global_mins[1] ||
-			plr_global_mins[2] > npc_global_maxs[2] ||
-			plr_global_maxs[2] < npc_global_mins[2]) {
-			continue;
-		}
-
-		float plr_center[3];
-		EntityWorldSpaceCenter(i, plr_center);
-
-		float to_plr[3];
-		SubtractVectors(plr_center, npc_center, to_plr);
-
-		float overlap[3];
-
-		float signX = 0.0;
-		float signY = 0.0;
-		float signZ = 0.0;
-
-		if(to_plr[0] >= 0.0) {
-			overlap[0] = npc_global_maxs[0] - plr_global_mins[0];
-			signX = 1.0;
-		} else {
-			overlap[0] = plr_global_maxs[0] - npc_global_mins[0];
-			signX = -1.0;
-		}
-
-		if(to_plr[1] >= 0.0) {
-			overlap[1] = npc_global_maxs[1] - plr_global_mins[1];
-			signY = 1.0;
-		} else {
-			overlap[1] = plr_global_maxs[1] - npc_global_mins[1];
-			signY = -1.0;
-		}
-
-		if(to_plr[2] >= 0.0) {
-			overlap[2] = npc_global_maxs[2] - plr_global_mins[2];
-			signZ = 1.0;
-		} else {
-			overlap[2] = 99999.9;
-			signZ = -1.0;
-		}
-
-		float bloat = 5.0;
-
-		float plr_new_pos[3];
-		plr_new_pos[0] = ply_pos[0];
-		plr_new_pos[1] = ply_pos[1];
-		plr_new_pos[2] = ply_pos[2];
-
-		if(overlap[0] < overlap[1]) {
-			if(overlap[0] < overlap[2]) {
-				plr_new_pos[0] += signX * (overlap[0] + bloat);
-			} else {
-				plr_new_pos[2] += signZ * (overlap[2] + bloat);
-			}
-		} else if(overlap[2] < overlap[1]) {
-			plr_new_pos[2] += signZ * (overlap[2] + bloat);
-		} else {
-			plr_new_pos[1] += signY * (overlap[1] + bloat);
-		}
-
-		TR_TraceHullFilter(plr_new_pos, plr_new_pos, ply_mins, ply_maxs, MASK_PLAYERSOLID, trace_filter_entity, i);
-		bool hit = TR_DidHit();
-
-		if(hit) {
-			float tmp_pos[3];
-			tmp_pos[0] = plr_new_pos[0];
-			tmp_pos[1] = plr_new_pos[1];
-			tmp_pos[2] = plr_new_pos[2] + 32.0;
-			TR_TraceHullFilter(tmp_pos, plr_new_pos, ply_mins, ply_maxs, MASK_PLAYERSOLID, trace_filter_entity, i);
-			bool solid = TR_StartSolid();
-
-			if(solid) {
-				//TakeDamage
-				continue;
-			} else {
-				TR_GetEndPosition(plr_new_pos);
-			}
-		}
-
-		EntitySetAbsOrigin(i, plr_new_pos);
-	}
-
-	return 0;
+	return true;
 }
 
-static MRESReturn npc_loc_collide(ILocomotion locomotion, int other, bool &result)
+static bool vision_ignored(GameVisionCustom vision, int subject)
 {
-	if(EntityIsCombatCharacter(other)) {
-		result = false;
-		return MRES_Supercede;
+	if(subject == 1) {
+		//return true;
 	}
 
-	return MRES_Ignored;
-}
+	INextBot bot = vision.Bot;
+	IIntentionCustom intention_custom = view_as<IIntentionCustom>(bot.IntentionInterface);
 
-static Action tankhealthbar_think(int entity, const char[] context)
-{
-	float health = float(GetEntProp(entity, Prop_Data, "m_iHealth"));
-	float maxhealth = float(GetEntProp(entity, Prop_Data, "m_iMaxHealth"));
-	SetEntPropFloat(entity, Prop_Send, "m_lastHealthPercentage", (health / maxhealth));
-	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
-	return Plugin_Continue;
+	if(subject >= 1 && subject <= MaxClients) {
+		if(intention_custom.has_data("sap_only")) {
+			return true;
+		}
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_OnFire) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Jarated) ||
+			TF2_IsPlayerInCondition(subject, TFCond_CloakFlicker) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Bleeding)) {
+			return false;
+		}
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_StealthedUserBuffFade)) {
+			return true;
+		}
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Cloaked) ||
+			TF2_IsPlayerInCondition(subject, TFCond_Stealthed) ||
+			TF2_IsPlayerInCondition(subject, TFCond_StealthedUserBuffFade)) {
+			/*if(player->m_Shared.GetPercentInvisible() < 0.75f) {
+				return false;
+			}*/
+
+			return true;
+		}
+
+		/*if(player->IsPlacingSapper()) {
+			return false;
+		}*/
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Disguising)) {
+			return false;
+		}
+
+		int entity = bot.Entity;
+		int my_team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
+
+		if(TF2_IsPlayerInCondition(subject, TFCond_Disguised) && GetEntProp(subject, Prop_Send, "m_nDisguiseTeam") == my_team) {
+			return true;
+		}
+	} else if(EntityIsBaseObject(subject)) {
+		if(GetEntProp(subject, Prop_Send, "m_bHasSapper")) {
+			return true;
+		}
+
+		if(GetEntProp(subject, Prop_Send, "m_bPlacing") ||
+			GetEntProp(subject, Prop_Send, "m_bCarried")) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_speed, float run_speed, bool fly)
 {
-	AnyLocomotion custom_locomotion = bot.AllocateLocomotion(fly);
-	if(fly) {
-		custom_locomotion.MaxJumpHeight = walk_speed;
-		custom_locomotion.DeathDropHeight = 9999999.0;
-		custom_locomotion.TraversableSlopeLimit = 9999999.0;
-		custom_locomotion.StepHeight = walk_speed;
-		custom_locomotion.WalkSpeed = run_speed;
-		custom_locomotion.RunSpeed = run_speed;
-		custom_locomotion.DesiredAltitude = walk_speed;
-		custom_locomotion.Acceleration = run_speed;
-	} else {
-		custom_locomotion.MaxJumpHeight = 180.0;
-		custom_locomotion.DeathDropHeight = 200.0;
-		custom_locomotion.StepHeight = STEP_HEIGHT;
-		custom_locomotion.WalkSpeed = walk_speed;
-		custom_locomotion.RunSpeed = run_speed;
-	}
-
-	bot.AllocateCustomVision();
+	IVisionCustom vision_custom = bot.AllocateCustomVision();
+	vision_custom.set_function("IsIgnored", vision_ignored);
+	vision_custom.set_function("IsVisibleEntityNoticed", vision_noticed);
 
 	IBodyCustom body_custom = bot.AllocateCustomBody();
 	body_custom.set_data("walk_anim_speed", walk_speed);
 	body_custom.set_data("run_anim_speed", run_speed);
 
-	float mins[3];
-	GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+	bot.MakeCustom();
 
 	float maxs[3];
 	GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
 
-	float width = maxs[1] > mins[1] ? maxs[1] : mins[1];
 	float height = maxs[2];
-
-	body_custom.HullWidth = width;
-
-	body_custom.CrouchHullHeight = height;
-	body_custom.StandHullHeight = height;
-	body_custom.LieHullHeight = height;
 
 	float view[3];
 	view[2] = height;
@@ -1004,36 +1056,55 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 	int initialteam = GetEntProp(entity, Prop_Data, "m_iInitialTeamNum");
 	if(initialteam == TEAM_UNASSIGNED) {
 		if(mvm) {
-			TeamManager_SetEntityTeam(entity, TF_TEAM_PVE_INVADERS, false);
+			TeamManager_SetEntityTeam(entity, TF_TEAM_PVE_INVADERS);
 		} else {
-			TeamManager_SetEntityTeam(entity, TF_TEAM_HALLOWEEN, false);
+			TeamManager_SetEntityTeam(entity, TF_TEAM_HALLOWEEN);
 		}
 	} else {
-		TeamManager_SetEntityTeam(entity, initialteam, false);
+		TeamManager_SetEntityTeam(entity, initialteam);
 	}
-
-	int team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
-	if((team == TF_TEAM_PVE_INVADERS || team == TF_TEAM_PVE_INVADERS_GIANTS) && mvm) {
-		//TODO!!!!! move this elsewhere
-		custom_locomotion.set_function("ShouldCollideWith", npc_loc_collide);
-	}
-
-	int solidmask = MASK_NPCSOLID;
-
-	switch(team) {
-		case TF_TEAM_RED: {
-			solidmask |= CONTENTS_BLUETEAM;
-		}
-		case TF_TEAM_BLUE: {
-			solidmask |= CONTENTS_REDTEAM;
-		}
-	}
-
-	body_custom.SolidMask = solidmask;
 
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
+	handle_npc_classname(entity, classname, fly);
+
+	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
+}
+
+static Action tankhealthbar_think(int entity, const char[] context)
+{
+	float health = float(GetEntProp(entity, Prop_Data, "m_iHealth"));
+	float maxhealth = float(GetEntProp(entity, Prop_Data, "m_iMaxHealth"));
+
+	float percentage = (health / maxhealth);
+
+	SetEntPropFloat(entity, Prop_Send, "m_lastHealthPercentage", percentage);
+
+	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
+	return Plugin_Continue;
+}
+
+static Action basenpcprops_think(int entity, const char[] context)
+{
+	INextBot bot = INextBot(entity);
+	ILocomotion locomotion = bot.LocomotionInterface;
+
+	bool moving = false;
+
+	float ground_speed = locomotion.GroundSpeed;
+	if(ground_speed > 0.1) {
+		moving = true;
+	}
+
+	SetEntProp(entity, Prop_Send, "m_bIsMoving", moving);
+
+	SetEntityNextThink(entity, GetGameTime() + 0.1, context);
+	return Plugin_Continue;
+}
+
+static void handle_npc_classname(int entity, char[] classname, bool fly)
+{
 	int idx = StrContains(classname, "_robothealthbar");
 	if(idx != -1) {
 		classname[idx] = '\0';
@@ -1047,15 +1118,29 @@ static void shared_npc_spawn(INextBot bot, int entity, int health, float walk_sp
 		} else {
 			SetEntProp(entity, Prop_Send, "m_eType", 2);
 		}
-	} else {
-		idx = StrContains(classname, "_tankhealthbar");
-		if(idx != -1) {
-			classname[idx] = '\0';
 
-			HookEntityContextThink(entity, tankhealthbar_think, "ThinkTankHealthbar");
-			SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkTankHealthbar");
-		}
+		return;
 	}
 
-	SetEntPropString(entity, Prop_Data, "m_iClassname", classname);
+	idx = StrContains(classname, "_tankhealthbar");
+	if(idx != -1) {
+		classname[idx] = '\0';
+
+		HookEntityContextThink(entity, tankhealthbar_think, "ThinkTankHealthbar");
+		SetEntityNextThink(entity, GetGameTime() + 0.1, "ThinkTankHealthbar");
+
+		return;
+	}
+
+	idx = StrContains(classname, "_basenpc");
+	if(idx != -1) {
+		classname[idx] = '\0';
+
+		SetEntProp(entity, Prop_Send, "m_bPerformAvoidance", 1);
+
+		HookEntityContextThink(entity, basenpcprops_think, "BaseNPCPropsThink");
+		SetEntityNextThink(entity, GetGameTime() + 0.1, "BaseNPCPropsThink");
+
+		return;
+	}
 }

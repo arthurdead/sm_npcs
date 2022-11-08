@@ -5,9 +5,9 @@
 #include <animhelpers>
 #include <sm_npcs>
 
-CustomBehaviorActionEntry basic_range_action;
+CustomBehaviorActionEntry main_action;
 
-#include "npcs_tf2_invasion/alien_commando/npc.sp"
+#include "npcs_tf2_invasion_update/saucer/npc.sp"
 
 static bool late_loaded;
 
@@ -19,7 +19,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	tf2i_alien_commando_init();
+	tf2_saucer_init();
 }
 
 public void OnAllPluginsLoaded()
@@ -31,27 +31,27 @@ public void OnAllPluginsLoaded()
 
 public void basic_behaviors_created()
 {
-	basic_range_action = get_behavior_action("BasicRange");
+	main_action = get_behavior_action("Main");
 }
 
 public void OnMapStart()
 {
 	int entity = CreateEntityByName("prop_dynamic_override");
 
-	tf2i_alien_commando_precache(entity);
+	tf2_saucer_precache(entity);
 
 	RemoveEntity(entity);
 }
 
 public void OnPluginEnd()
 {
-	remove_entities_of_classname("npc_tf2i_*");
+	remove_entities_of_classname("npc_tf2_*");
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	if(StrContains(classname, "npc_tf2i_alien_commando") != -1) {
-		tf2i_alien_commando_created(entity);
+	if(StrContains(classname, "npc_tf2_saucer") != -1) {
+		tf2_saucer_created(entity);
 	}
 }
 
@@ -64,7 +64,7 @@ public void OnEntityDestroyed(int entity)
 	char classname[64];
 	GetEntityClassname(entity, classname, sizeof(classname));
 
-	if(StrContains(classname, "npc_tf2i_alien_commando") != -1) {
-		tf2i_alien_commando_destroyed(entity);
+	if(StrContains(classname, "npc_tf2_saucer") != -1) {
+		tf2_saucer_destroyed(entity);
 	}
 }

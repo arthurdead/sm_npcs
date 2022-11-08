@@ -45,11 +45,9 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 
 void fortified_distruptor_precache(int entity)
 {
-	PrecacheModel("models/fortified/mob/distruptor/distruptor.mdl");
+	PrecacheModel("models/arthurdead/fortified/mob/distruptor/distruptor.mdl");
 
-	//AddModelToDownloadsTable("models/fortified/mob/distruptor/distruptor.mdl");
-
-	SetEntityModel(entity, "models/fortified/mob/distruptor/distruptor.mdl");
+	//AddModelToDownloadsTable("models/arthurdead/fortified/mob/distruptor/distruptor.mdl");
 }
 
 void fortified_distruptor_created(int entity)
@@ -63,54 +61,25 @@ static Action npc_think(int entity)
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
 
-	npc_hull_debug(bot, body, locomotion, entity);
+	//npc_hull_debug(bot, body, locomotion, entity);
 
-	npc_resolve_collisions(bot, entity);
+	if(entity_is_alive(entity)) {
+		handle_playbackrate(entity, locomotion, body);
 
-	handle_playbackrate(entity, locomotion, body);
-
-	return Plugin_Continue;
-}
-
-static Activity npc_translate_act(IBodyCustom body, Activity act)
-{
-	switch(act) {
-		case ACT_JUMP: {
-			return ACT_INVALID;
-		}
-
-		case ACT_IDLE_AGITATED: {
-			return ACT_IDLE;
-		}
-		case ACT_IDLE_STIMULATED: {
-			return ACT_IDLE;
-		}
-		case ACT_IDLE_RELAXED: {
-			return ACT_IDLE;
-		}
-
-		case ACT_RUN_AGITATED: {
-			return ACT_WALK;
-		}
-		case ACT_RUN_STIMULATED: {
-			return ACT_WALK;
-		}
-		case ACT_RUN_RELAXED: {
-			return ACT_WALK;
-		}
-
-		case ACT_WALK_AGITATED: {
-			return ACT_WALK;
-		}
-		case ACT_WALK_STIMULATED: {
-			return ACT_WALK;
-		}
-		case ACT_WALK_RELAXED: {
-			return ACT_WALK;
+		if(!locomotion.OnGround ||
+			locomotion.DidJustJump) {
+			body.StartActivity(ACT_IDLE);
+		} else {
+			float ground_speed = locomotion.GroundSpeed;
+			if(ground_speed > 0.1) {
+				body.StartActivity(ACT_WALK);
+			} else {
+				body.StartActivity(ACT_IDLE);
+			}
 		}
 	}
 
-	return act;
+	return Plugin_Continue;
 }
 
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
@@ -124,21 +93,19 @@ static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
 
 static void npc_spawn(int entity)
 {
-	SetEntityModel(entity, "models/fortified/mob/distruptor/distruptor.mdl");
+	SetEntityModel(entity, "models/arthurdead/fortified/mob/distruptor/distruptor.mdl");
 	SetEntityModelScale(entity, 1.0);
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Distruptor");
 
-	float speed = 50.0;
-
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, speed, speed);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 50.0, 50.0);
 	HookEntityThink(entity, npc_think);
 
 	bot.AllocateCustomIntention(fortified_distruptor_behavior, "FortifiedDistruptorBehavior");
 
 	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
-	body_custom.set_function("TranslateActivity", npc_translate_act);
+	body_custom.HeadAsAngles = false;
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 }

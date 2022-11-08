@@ -5,7 +5,7 @@ void scenario_monitor_action_init()
 	scenario_monitor_action = new CustomBehaviorActionEntry("ScenarioMonitor");
 	scenario_monitor_action.set_function("OnStart", action_start);
 	scenario_monitor_action.set_function("Update", action_update);
-	scenario_monitor_action.set_function("InitialContainedAction", action_containedaction);
+	//scenario_monitor_action.set_function("InitialContainedAction", action_containedaction);
 }
 
 static BehaviorAction action_containedaction(CustomBehaviorAction action, INextBot bot, int entity)

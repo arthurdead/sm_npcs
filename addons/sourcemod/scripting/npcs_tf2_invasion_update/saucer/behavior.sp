@@ -1,6 +1,6 @@
-static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, int victim, const float sight_pos[3])
+static void handle_fire(IIntentionCustom intention, INextBot bot, int entity, int victim, const float sight_pos[3])
 {
-	float attack_time = action.get_data("attack_time");
+	float attack_time = intention.get_data("attack_time");
 	if(attack_time < GetGameTime()) {
 		FireBulletsInfo_t bullets;
 		bullets.Init();
@@ -26,13 +26,16 @@ static void handle_fire(CustomBehaviorAction action, INextBot bot, int entity, i
 
 		EmitGameSoundToAll("Weapon_Capper.Single", entity);
 
-		action.set_data("attack_time", GetGameTime() + 0.5);
+		intention.set_data("attack_time", GetGameTime() + 0.5);
 	}
 }
 
-BehaviorAction tf2_saucer_behavior(int entity)
+BehaviorAction tf2_saucer_behavior(IIntentionCustom intention, INextBot bot, int entity)
 {
-	CustomBehaviorAction action = basic_range_action.create();
-	action.set_function("handle_fire", handle_fire);
+	intention.set_function("handle_fire", handle_fire);
+
+	intention.set_data("attack_time", GetGameTime());
+
+	CustomBehaviorAction action = main_action.create();
 	return action;
 }

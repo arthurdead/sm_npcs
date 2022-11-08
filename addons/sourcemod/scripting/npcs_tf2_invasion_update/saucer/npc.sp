@@ -45,15 +45,13 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 	return npc_pop_spawn_single("npc_tf2_saucer", spawner, pos, result);
 }
 
-#define TF2_SAUCER_MODEL "models/props_teaser/saucer.mdl"
-
 void tf2_saucer_precache(int entity)
 {
-	PrecacheModel(TF2_SAUCER_MODEL);
+	PrecacheModel("models/arthurdead/tf2_invasion_update/saucer/saucer.mdl");
 
-	//AddModelToDownloadsTable(TF2_SAUCER_MODEL);
+	//AddModelToDownloadsTable("models/arthurdead/tf2_invasion_update/saucer/saucer.mdl");
 
-	SetEntityModel(entity, TF2_SAUCER_MODEL);
+	SetEntityModel(entity, "models/arthurdead/tf2_invasion_update/saucer/saucer.mdl");
 
 	npc_idle_anim = AnimatingLookupSequence(entity, "idle");
 
@@ -76,8 +74,6 @@ static Action npc_think(int entity)
 	IBody body = bot.BodyInterface;
 
 	npc_hull_debug(bot, body, locomotion, entity);
-
-	npc_resolve_collisions(bot, entity);
 
 	//handle_playbackrate(entity, locomotion, body);
 
@@ -112,8 +108,8 @@ static void npc_pitch(NextBotFlyingLocomotion locomotion, float &pitch)
 
 static void npc_spawn(int entity)
 {
-	SetEntityModel(entity, TF2_SAUCER_MODEL);
-	SetEntityModelScale(entity, 2.0);
+	SetEntityModel(entity, "models/arthurdead/tf2_invasion_update/saucer/saucer.mdl");
+	SetEntityModelScale(entity, 0.5);
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Saucer");
 

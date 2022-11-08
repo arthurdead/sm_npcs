@@ -16,15 +16,22 @@ void seek_and_destroy_action_init()
 
 static CNavArea choose_goal_area(INextBot bot, int entity)
 {
-	int my_team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
-	int enemy_team = TeamManager_GetEnemyTeam(my_team);
-
 	ArrayList goalVector = new ArrayList();
-	CTFNavMesh.CollectSpawnRoomThresholdAreas(goalVector, enemy_team);
+
+	if(IsMannVsMachineMode()) {
+		CTFNavMesh.CollectAreaWithinBombTravelRange(goalVector, 0.0, tf_populator_active_buffer_range.FloatValue);
+	} else {
+		int my_team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
+		int enemy_team = TeamManager_GetEnemyTeam(my_team);
+
+		CTFNavMesh.CollectSpawnRoomThresholdAreas(goalVector, enemy_team);
+	}
+
+	int len = goalVector.Length;
 
 	CNavArea goalArea = CNavArea_Null;
 
-	int len = goalVector.Length;
+	len = goalVector.Length;
 	if(len > 0) {
 		goalArea = goalVector.Get(GetURandomInt() % len);
 	}
@@ -109,6 +116,7 @@ static BehaviorResultType action_start(CustomBehaviorAction action, INextBot bot
 	action.set_data("m_repathTimer", GetGameTime());
 
 	PathFollower path = new PathFollower();
+	path.MinLookAheadDistance = GetDesiredPathLookAheadRange(entity);
 	action.set_data("m_path", path);
 
 	recompute_seek_path(action, bot, entity);

@@ -1,3 +1,5 @@
+int tf2_shooting_star_muzzle = -1;
+
 #include "behavior.sp"
 
 static ConVar npc_health_cvar;
@@ -12,7 +14,7 @@ static void npc_datamap_init(CustomDatamap datamap)
 
 void mars_attacks_martian_init()
 {
-	npc_health_cvar = CreateConVar("sk_mars_attack_martian_health", "1000");
+	npc_health_cvar = CreateConVar("sk_mars_attacks_martian_health", "1000");
 
 	create_npc_factories("npc_mars_attacks_martian", "MarsAttacksMartian", npc_datamap_init);
 
@@ -48,13 +50,18 @@ static bool npc_pop_spawn(CustomPopulationSpawner spawner, float pos[3], ArrayLi
 
 void mars_attacks_martian_precache(int entity)
 {
-	PrecacheModel("models/mars_attacks/martian/martian.mdl");
-
-	//AddModelToDownloadsTable("models/mars_attacks/martian/martian.mdl");
-
+	PrecacheModel("models/arthurdead/mars_attacks/martian/martian.mdl");
 	PrecacheModel("models/workshop/weapons/c_models/c_invasion_sniperrifle/c_invasion_sniperrifle.mdl");
 
-	SetEntityModel(entity, "models/mars_attacks/martian/martian.mdl");
+	PrecacheScriptSound("Weapon_ShootingStar.SingleCharged");
+
+	//AddModelToDownloadsTable("models/arthurdead/mars_attacks/martian/martian.mdl");
+
+	SetEntityModel(entity, "models/workshop/weapons/c_models/c_invasion_sniperrifle/c_invasion_sniperrifle.mdl");
+
+	tf2_shooting_star_muzzle = AnimatingLookupAttachment(entity, "muzzle");
+
+	SetEntityModel(entity, "models/arthurdead/mars_attacks/martian/martian.mdl");
 
 	npc_move_x = AnimatingLookupPoseParameter(entity, "move_x");
 	npc_move_y = AnimatingLookupPoseParameter(entity, "move_y");
@@ -71,74 +78,34 @@ static Action npc_think(int entity)
 	ILocomotion locomotion = bot.LocomotionInterface;
 	IBody body = bot.BodyInterface;
 
-	npc_hull_debug(bot, body, locomotion, entity);
+	//npc_hull_debug(bot, body, locomotion, entity);
 
-	npc_resolve_collisions(bot, entity);
+	if(entity_is_alive(entity)) {
+		handle_playbackrate(entity, locomotion, body);
+		handle_move_xy(entity, npc_move_x, npc_move_y, locomotion);
 
-	handle_playbackrate(entity, locomotion, body);
-
-	handle_move_xy(entity, npc_move_x, npc_move_y, locomotion);
-
-	float ground_speed = locomotion.GroundSpeed;
-	if(ground_speed > 0.1) {
-		if(locomotion.Running) {
-			body.StartActivity(ACT_RUN, NO_ACTIVITY_FLAGS);
+		if(!locomotion.OnGround ||
+			locomotion.DidJustJump) {
+			body.StartActivity(ACT_JUMP);
 		} else {
-			body.StartActivity(ACT_WALK_AIM_RIFLE_STIMULATED, NO_ACTIVITY_FLAGS);
+			float ground_speed = locomotion.GroundSpeed;
+			if(ground_speed > 0.01) {
+				if(locomotion.Running) {
+					body.StartActivity(ACT_RUN);
+				} else {
+					body.StartActivity(ACT_WALK);
+				}
+			} else {
+				if(body.IsActualPosture(CROUCH)) {
+					body.StartActivity(ACT_CROUCHIDLE);
+				} else {
+					body.StartActivity(ACT_IDLE_AIM_RIFLE_STIMULATED);
+				}
+			}
 		}
-	} else {
-		body.StartActivity(ACT_IDLE_AIM_RIFLE_STIMULATED, NO_ACTIVITY_FLAGS);
 	}
 
 	return Plugin_Continue;
-}
-
-static Activity npc_translate_act(IBodyCustom body, Activity act)
-{
-	switch(act) {
-		case ACT_JUMP: {
-			return ACT_INVALID;
-		}
-
-		case ACT_IDLE_AGITATED: {
-			switch(GetURandomInt() % 3) {
-				case 0: return ACT_IDLE_AIM_RIFLE_STIMULATED;
-				case 1: return ACT_IDLE_AGITATED;
-			}
-		}
-		case ACT_IDLE_STIMULATED: {
-			switch(GetURandomInt() % 4) {
-				case 0: return ACT_IDLE_AIM_RIFLE_STIMULATED;
-				case 1: return ACT_IDLE_STIMULATED;
-				case 2: return ACT_IDLE_STIMULATED;
-			}
-		}
-		case ACT_IDLE_RELAXED: {
-			return ACT_IDLE_RELAXED;
-		}
-
-		case ACT_RUN_AGITATED: {
-			return ACT_RUN;
-		}
-		case ACT_RUN_STIMULATED: {
-			return ACT_RUN;
-		}
-		case ACT_RUN_RELAXED: {
-			return ACT_RUN;
-		}
-
-		case ACT_WALK_AGITATED: {
-			return ACT_WALK_AIM_RIFLE_STIMULATED;
-		}
-		case ACT_WALK_STIMULATED: {
-			return ACT_WALK_AIM_RIFLE_STIMULATED;
-		}
-		case ACT_WALK_RELAXED: {
-			return ACT_WALK_AIM_RIFLE_STIMULATED;
-		}
-	}
-
-	return act;
 }
 
 static Action npc_takedmg(int entity, CTakeDamageInfo info, int &result)
@@ -175,6 +142,30 @@ enum
 	martian_helmet_exploded,
 	martian_helmet_splattered,
 	martian_helmet_num,
+}
+
+static void martian_get_skins(int entity, int &body = 0, int &head = 0, int &helmet = 0)
+{
+	int skin = GetEntProp(entity, Prop_Send, "m_nSkin");
+
+	int goo_head_start = (martian_body_num * martian_helmet_num);
+	if(skin >= goo_head_start) {
+		skin -= goo_head_start;
+		head = martian_head_goo;
+	} else {
+		head = martian_head_default;
+	}
+
+	for(int i = 0; i < martian_helmet_num; ++i) {
+		int helmet_end = ((i+1) * martian_body_num);
+		if(skin <= helmet_end) {
+			skin -= helmet_end;
+			helmet = i;
+			break;
+		}
+	}
+
+	body = -skin;
 }
 
 static int calc_martian_skin(int body, int head, int helmet)
@@ -226,20 +217,18 @@ static int calc_martian_skin(int body, int head, int helmet)
 		}
 	}
 
-	PrintToServer("%i", skin);
-
 	return skin;
 }
 
 static void npc_spawn(int entity)
 {
-	SetEntityModel(entity, "models/mars_attacks/martian/martian.mdl");
+	SetEntityModel(entity, "models/arthurdead/mars_attacks/martian/martian.mdl");
 	SetEntityModelScale(entity, 1.0);
 	SetEntProp(entity, Prop_Data, "m_bloodColor", DONT_BLEED);
 	SetEntPropString(entity, Prop_Data, "m_iName", "Martian");
 
 	INextBot bot = INextBot(entity);
-	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 100.0, 250.0);
+	ground_npc_spawn(bot, entity, npc_health_cvar.IntValue, 100.0, 200.0);
 	HookEntityThink(entity, npc_think);
 
 	bool mvm = IsMannVsMachineMode();
@@ -273,9 +262,6 @@ static void npc_spawn(int entity)
 	SetEntProp(entity, Prop_Send, "m_nSkin", skin);
 
 	bot.AllocateCustomIntention(mars_attacks_martian_behavior, "MarsAttacksMartianBehavior");
-
-	IBodyCustom body_custom = view_as<IBodyCustom>(bot.BodyInterface);
-	body_custom.set_function("TranslateActivity", npc_translate_act);
 
 	HookEntityOnTakeDamageAlive(entity, npc_takedmg, true);
 
